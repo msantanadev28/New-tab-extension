@@ -10,6 +10,7 @@ interface AppBookmark {
   url: string;
   icon: string;
   backgroundImage?: string;
+  showIcon?: boolean;
 }
 
 interface AppSettings {
@@ -21,6 +22,7 @@ interface AppSettings {
   gap: number;
   showSearch: boolean;
   showIcons: boolean;
+  backgroundImage?: string;
 }
 
 const INITIAL_BOOKMARKS: AppBookmark[] = [
@@ -38,12 +40,19 @@ const INITIAL_BOOKMARKS: AppBookmark[] = [
   template: `
     <div [class]="containerClass()">
 
-      <!-- Dynamic Background Gradient -->
+      <!-- Dynamic Background -->
       <div class="fixed inset-0 -z-10 overflow-hidden pointer-events-none">
-        <div class="absolute -top-1/4 -left-1/4 w-1/2 h-1/2 rounded-full blur-[120px] opacity-20"
-             [class.bg-blue-600]="settings().theme === 'dark'" [class.bg-blue-400]="settings().theme === 'light'"></div>
-        <div class="absolute -bottom-1/4 -right-1/4 w-1/2 h-1/2 rounded-full blur-[120px] opacity-20"
-             [class.bg-purple-600]="settings().theme === 'dark'" [class.bg-purple-400]="settings().theme === 'light'"></div>
+        @if (settings().backgroundImage) {
+          <img [src]="settings().backgroundImage" class="absolute inset-0 w-full h-full object-cover transition-opacity duration-1000" alt="" />
+          <div class="absolute inset-0 backdrop-blur-sm transition-all"
+               [class.bg-black/40]="settings().theme === 'dark'" 
+               [class.bg-white/40]="settings().theme === 'light'"></div>
+        } @else {
+          <div class="absolute -top-1/4 -left-1/4 w-1/2 h-1/2 rounded-full blur-[120px] opacity-20 transition-all"
+               [class.bg-blue-600]="settings().theme === 'dark'" [class.bg-blue-400]="settings().theme === 'light'"></div>
+          <div class="absolute -bottom-1/4 -right-1/4 w-1/2 h-1/2 rounded-full blur-[120px] opacity-20 transition-all"
+               [class.bg-purple-600]="settings().theme === 'dark'" [class.bg-purple-400]="settings().theme === 'light'"></div>
+        }
       </div>
 
       <!-- Main Header -->
@@ -95,6 +104,7 @@ const INITIAL_BOOKMARKS: AppBookmark[] = [
               <a
                 [href]="bookmark.url"
                 [target]="settings().openInNewTab ? '_blank' : '_self'"
+                (contextmenu)="onContextMenu($event, bookmark)"
                 class="flex flex-col items-center justify-center gap-4 p-6 rounded-[2rem] group-hover:scale-105 group-hover:-translate-y-1 transition-all duration-300 relative overflow-hidden"
                 [class]="glassEffect() + ' ' + itemHover()"
               >
@@ -106,24 +116,20 @@ const INITIAL_BOOKMARKS: AppBookmark[] = [
                   </div>
                 }
 
+                <!-- Icon Area (Stabilized for height/width) -->
                 @if (settings().showIcons) {
-                  <div class="w-16 h-16 rounded-2xl flex items-center justify-center p-3 shadow-inner bg-white/5 relative z-10">
-                    <img [src]="bookmark.icon" alt="" class="w-full h-full object-contain filter drop-shadow-md" />
+                  <div class="w-16 h-16 rounded-2xl flex items-center justify-center p-3 transition-all relative z-10"
+                       [class.bg-white/5]="bookmark.showIcon !== false" [class.shadow-inner]="bookmark.showIcon !== false">
+                    @if (bookmark.showIcon !== false) {
+                      <img [src]="bookmark.icon" alt="" class="w-full h-full object-contain filter drop-shadow-md" />
+                    }
                   </div>
                 }
+
                 <span class="text-sm font-medium opacity-80 group-hover:opacity-100 transition-opacity truncate w-full text-center relative z-10">
                   {{ bookmark.title }}
                 </span>
               </a>
-
-              <div class="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-all z-20">
-                <button (click)="openEditModal(bookmark)" class="p-1.5 rounded-lg bg-black/40 hover:bg-black/60 text-white">
-                  <i class="w-3 h-3" data-lucide="edit-2"></i>
-                </button>
-                <button (click)="removeBookmark(bookmark.id)" class="p-1.5 rounded-lg bg-red-500/40 hover:bg-red-500/60 text-white">
-                  <i class="w-3 h-3" data-lucide="trash-2"></i>
-                </button>
-              </div>
             </div>
           }
 
@@ -251,6 +257,14 @@ const INITIAL_BOOKMARKS: AppBookmark[] = [
                   <input type="range" min="3" max="8" [value]="settings().columns"
                          (input)="onColumnChange($event)" class="w-full accent-blue-500" />
                 </div>
+
+                <div class="space-y-4">
+                  <label class="text-sm font-medium opacity-60">Dashboard Background URL</label>
+                  <input type="text" [value]="settings().backgroundImage || ''"
+                         (input)="onBackgroundChange($event)"
+                         class="w-full p-4 rounded-2xl bg-black/10 border-none outline-none focus:ring-2 ring-blue-500/50 text-sm"
+                         placeholder="https://images.unsplash.com/..." />
+                </div>
               </div>
             }
 
@@ -272,6 +286,20 @@ const INITIAL_BOOKMARKS: AppBookmark[] = [
                   <input name="backgroundImage" [value]="editingBookmark()?.backgroundImage || ''"
                          class="w-full p-4 rounded-2xl bg-black/10 border-none outline-none focus:ring-2 ring-blue-500/50" placeholder="https://images.unsplash.com/..." />
                 </div>
+
+                <div class="space-y-4 pt-2">
+                  <div class="flex items-center justify-between">
+                    <label class="text-sm font-medium opacity-80">Show Icon on Dashboard</label>
+                    <button type="button" (click)="tempShowIcon.set(!tempShowIcon())"
+                      class="w-12 h-6 rounded-full transition-all relative"
+                      [style.background-color]="tempShowIcon() ? '#3b82f6' : 'rgba(156, 163, 175, 0.3)'">
+                      <div class="absolute top-1 w-4 h-4 rounded-full bg-white transition-all"
+                           [style.left]="tempShowIcon() ? '1.75rem' : '0.25rem'"></div>
+                    </button>
+                    <input type="hidden" name="showIcon" [value]="tempShowIcon()" />
+                  </div>
+                </div>
+
                 <button type="submit" class="w-full py-4 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-2xl transition-all shadow-lg shadow-blue-500/30">
                   {{ editingBookmark() ? 'Save Changes' : 'Add to Dashboard' }}
                 </button>
@@ -281,10 +309,30 @@ const INITIAL_BOOKMARKS: AppBookmark[] = [
         </div>
       }
 
+      <!-- Context Menu -->
+      @if (contextMenu(); as menu) {
+        <div class="fixed z-[100] w-48 rounded-2xl p-1.5 animate-in fade-in zoom-in-95 duration-150"
+             [class]="glassEffect()"
+             [style.left.px]="menu.x"
+             [style.top.px]="menu.y"
+             (click)="$event.stopPropagation()">
+          <button (click)="openEditModal(menu.bookmark); closeContextMenu()"
+            class="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all text-sm font-medium"
+            [class]="itemHover()">
+            <i class="w-4 h-4" data-lucide="edit-2"></i> Edit Bookmark
+          </button>
+          <button (click)="removeBookmark(menu.bookmark.id); closeContextMenu()"
+            class="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all text-sm font-medium text-red-500 hover:bg-red-500/10"
+            [class]="itemHover()">
+            <i class="w-4 h-4" data-lucide="trash-2"></i> Remove
+          </button>
+        </div>
+      }
+
     </div>
   `,
   styles: [`
-    :host { display: block; }
+    :host { display: block; height: 100vh; width: 100vw; }
     .custom-scrollbar::-webkit-scrollbar { width: 4px; }
     .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
     .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.1); border-radius: 10px; }
@@ -309,7 +357,9 @@ export class App implements OnInit {
   isSettingsOpen = signal(false);
   isAddModalOpen = signal(false);
   editingBookmark = signal<AppBookmark | null>(null);
+  tempShowIcon = signal(true);
   isSidebarHovered = signal(false);
+  contextMenu = signal<{x: number, y: number, bookmark: AppBookmark} | null>(null);
 
   // Helper for settings UI
   toggleItems: { label: string, key: keyof AppSettings }[] = [
@@ -370,8 +420,19 @@ export class App implements OnInit {
       this.isSettingsOpen();
       this.isAddModalOpen();
       this.isSidebarHovered();
+      this.contextMenu();
       setTimeout(() => createIcons({ icons }), 50);
     });
+
+    // Global listener to close context menu
+    if (isPlatformBrowser(platformId)) {
+      window.addEventListener('click', () => this.closeContextMenu());
+      window.addEventListener('contextmenu', (e) => {
+        if (!(e.target as HTMLElement).closest('a')) {
+          this.closeContextMenu();
+        }
+      });
+    }
   }
 
   ngOnInit() {
@@ -407,17 +468,41 @@ export class App implements OnInit {
     window.location.href = `https://www.google.com/search?q=${encodeURIComponent(query)}`;
   }
 
+  // --- Context Menu Actions ---
+  onContextMenu(e: MouseEvent, bookmark: AppBookmark) {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    // Adjust position so it doesn't go off-screen
+    let x = e.clientX;
+    let y = e.clientY;
+    const menuWidth = 192; // w-48
+    const menuHeight = 100;
+    
+    if (x + menuWidth > window.innerWidth) x -= menuWidth;
+    if (y + menuHeight > window.innerHeight) y -= menuHeight;
+
+    this.contextMenu.set({ x, y, bookmark });
+    setTimeout(() => createIcons({ icons }), 10);
+  }
+
+  closeContextMenu() {
+    this.contextMenu.set(null);
+  }
+
   removeBookmark(id: string) {
     this.bookmarks.update(prev => prev.filter(b => b.id !== id));
   }
 
   openAddModal() {
     this.editingBookmark.set(null);
+    this.tempShowIcon.set(true);
     this.isAddModalOpen.set(true);
   }
 
   openEditModal(bookmark: AppBookmark) {
     this.editingBookmark.set(bookmark);
+    this.tempShowIcon.set(bookmark.showIcon !== false);
     this.isAddModalOpen.set(true);
   }
 
@@ -436,6 +521,11 @@ export class App implements OnInit {
     this.updateSetting('columns', parseInt(val));
   }
 
+  onBackgroundChange(event: Event) {
+    const val = (event.target as HTMLInputElement).value;
+    this.updateSetting('backgroundImage', val);
+  }
+
   handleBookmarkSubmit(e: Event) {
     e.preventDefault();
     const form = e.target as HTMLFormElement;
@@ -443,6 +533,7 @@ export class App implements OnInit {
     const title = formData.get('title') as string;
     const url = formData.get('url') as string;
     const backgroundImage = formData.get('backgroundImage') as string;
+    const showIcon = formData.get('showIcon') === 'true';
 
     let icon = 'https://www.google.com/s2/favicons?domain=example.com&sz=64';
     try {
@@ -454,9 +545,9 @@ export class App implements OnInit {
 
     const editItem = this.editingBookmark();
     if (editItem) {
-      this.bookmarks.update(prev => prev.map(b => b.id === editItem.id ? { ...b, title, url, icon, backgroundImage } : b));
+      this.bookmarks.update(prev => prev.map(b => b.id === editItem.id ? { ...b, title, url, icon, backgroundImage, showIcon } : b));
     } else {
-      this.bookmarks.update(prev => [...prev, { id: Date.now().toString(), title, url, icon, backgroundImage }]);
+      this.bookmarks.update(prev => [...prev, { id: Date.now().toString(), title, url, icon, backgroundImage, showIcon }]);
     }
     this.closeModals();
   }
