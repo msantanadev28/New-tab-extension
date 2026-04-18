@@ -1,6 +1,8 @@
 import { Component, signal, computed, effect, inject, PLATFORM_ID, OnInit } from '@angular/core';
 import { CommonModule, isPlatformBrowser } from '@angular/common';
 import { createIcons, icons } from 'lucide';
+import speedDialExportJson from '../../template/speed-dial-2-export-2026-04-18.json';
+import { SpeedDialExport, SpeedDialExportModel, type SpeedDialThemeMode } from './speed-dial.model';
 
 declare var chrome: any;
 
@@ -14,7 +16,7 @@ interface AppBookmark {
 }
 
 interface AppSettings {
-  theme: 'light' | 'dark';
+  theme: SpeedDialThemeMode;
   centerVertically: boolean;
   compactLayout: boolean;
   openInNewTab: boolean;
@@ -25,13 +27,73 @@ interface AppSettings {
   backgroundImage?: string;
 }
 
-const INITIAL_BOOKMARKS: AppBookmark[] = [
-  { id: '1', title: 'GitHub', url: 'https://github.com', icon: 'https://github.com/favicon.ico' },
-  { id: '2', title: 'YouTube', url: 'https://youtube.com', icon: 'https://www.youtube.com/favicon.ico' },
-  { id: '3', title: 'Gmail', url: 'https://mail.google.com', icon: 'https://ssl.gstatic.com/ui/v1/icons/mail/images/2/favicon.ico' },
-  { id: '4', title: 'Twitter', url: 'https://twitter.com', icon: 'https://abs.twimg.com/favicons/twitter.2.ico' },
-  { id: '5', title: 'Reddit', url: 'https://reddit.com', icon: 'https://www.redditstatic.com/desktop2x/img/favicon/favicon-32x32.png' },
-];
+interface AppRecentlyClosedTab {
+  title: string;
+  url?: string;
+  icon?: string;
+}
+
+interface StoredAppState {
+  bookmarks?: AppBookmark[];
+  settings?: Partial<AppSettings>;
+}
+
+interface ChromeTabSession {
+  title?: string;
+  url?: string;
+  favIconUrl?: string;
+}
+
+interface ChromeRecentlyClosedSession {
+  tab?: ChromeTabSession;
+}
+
+type ToggleSettingKey = 'centerVertically' | 'compactLayout' | 'openInNewTab' | 'showIcons';
+
+const INITIAL_SPEED_DIAL_EXPORT = SpeedDialExportModel.fromJson(speedDialExportJson as SpeedDialExport);
+
+function buildFaviconUrl(url: string): string {
+  try {
+    const hostname = new URL(url).hostname;
+    return `https://www.google.com/s2/favicons?domain=${hostname}&sz=64`;
+  } catch {
+    return 'https://www.google.com/s2/favicons?domain=example.com&sz=64';
+  }
+}
+
+function mapSpeedDialBookmarks(data: SpeedDialExportModel): AppBookmark[] {
+  return [...data.dials]
+    .sort((left, right) => left.position - right.position)
+    .map((dial) => ({
+      id: String(dial.id),
+      title: dial.title,
+      url: dial.url,
+      icon: buildFaviconUrl(dial.url),
+      backgroundImage: dial.thumbnail || undefined,
+      showIcon: true,
+    }));
+}
+
+function mapSpeedDialSettings(data: SpeedDialExportModel): AppSettings {
+  const { preferences } = data;
+  const defaultTheme: SpeedDialThemeMode = 'dark';
+  const activeTheme = preferences.theme[defaultTheme];
+
+  return {
+    theme: defaultTheme,
+    centerVertically: preferences.centeredLayout,
+    compactLayout: false,
+    openInNewTab: preferences.openInNewTab,
+    columns: preferences.columns,
+    gap: preferences.spacing,
+    showSearch: true,
+    showIcons: true,
+    backgroundImage: activeTheme.backgroundImage || undefined,
+  };
+}
+
+const INITIAL_BOOKMARKS = mapSpeedDialBookmarks(INITIAL_SPEED_DIAL_EXPORT);
+const INITIAL_SETTINGS = mapSpeedDialSettings(INITIAL_SPEED_DIAL_EXPORT);
 
 @Component({
   selector: 'app-root',
@@ -342,17 +404,9 @@ const INITIAL_BOOKMARKS: AppBookmark[] = [
 export class App implements OnInit {
   // --- Signals (State) ---
   bookmarks = signal<AppBookmark[]>(INITIAL_BOOKMARKS);
-  recentlyClosed = signal<any[]>([]);
-  settings = signal<AppSettings>({
-    theme: 'dark',
-    centerVertically: true,
-    compactLayout: false,
-    openInNewTab: true,
-    columns: 5,
-    gap: 24,
-    showSearch: true,
-    showIcons: true
-  });
+  recentlyClosed = signal<AppRecentlyClosedTab[]>([]);
+  settings = signal<AppSettings>(INITIAL_SETTINGS);
+  storageHydrated = signal(false);
 
   isSettingsOpen = signal(false);
   isAddModalOpen = signal(false);
@@ -362,7 +416,7 @@ export class App implements OnInit {
   contextMenu = signal<{x: number, y: number, bookmark: AppBookmark} | null>(null);
 
   // Helper for settings UI
-  toggleItems: { label: string, key: keyof AppSettings }[] = [
+  toggleItems: { label: string, key: ToggleSettingKey }[] = [
     { label: 'Center Content', key: 'centerVertically' },
     { label: 'Compact Grid', key: 'compactLayout' },
     { label: 'Open in New Tab', key: 'openInNewTab' },
@@ -408,6 +462,10 @@ export class App implements OnInit {
 
     // Effect to persist changes automatically
     effect(() => {
+      if (!this.storageHydrated()) {
+        return;
+      }
+
       const state = { bookmarks: this.bookmarks(), settings: this.settings() };
       if (typeof chrome !== 'undefined' && chrome.storage) {
         chrome.storage.local.set(state);
@@ -441,24 +499,34 @@ export class App implements OnInit {
   }
 
   private initData() {
-    if (typeof chrome !== 'undefined' && chrome.storage) {
-      chrome.storage.local.get(['bookmarks', 'settings'], (result: any) => {
-        if (result.bookmarks) this.bookmarks.set(result.bookmarks);
-        if (result.settings) this.settings.set({ ...this.settings(), ...result.settings });
-      });
+    if (typeof chrome === 'undefined' || !chrome.storage) {
+      this.storageHydrated.set(true);
+      return;
+    }
 
-      if (chrome.sessions) {
-        chrome.sessions.getRecentlyClosed({ maxResults: 10 }, (sessions: any[]) => {
-          const closed = sessions
-            .filter((s: any) => s.tab)
-            .map((s: any) => ({
-              title: s.tab!.title,
-              url: s.tab!.url,
-              icon: s.tab!.favIconUrl
-            }));
-          this.recentlyClosed.set(closed);
-        });
+    chrome.storage.local.get(['bookmarks', 'settings'], (result: StoredAppState) => {
+      if (result.bookmarks) {
+        this.bookmarks.set(result.bookmarks);
       }
+
+      if (result.settings) {
+        this.settings.set({ ...this.settings(), ...result.settings });
+      }
+
+      this.storageHydrated.set(true);
+    });
+
+    if (chrome.sessions) {
+      chrome.sessions.getRecentlyClosed({ maxResults: 10 }, (sessions: ChromeRecentlyClosedSession[]) => {
+        const closed = sessions
+          .filter((session) => session.tab?.url)
+          .map((session) => ({
+            title: session.tab?.title ?? 'Untitled tab',
+            url: session.tab?.url,
+            icon: session.tab?.favIconUrl,
+          }));
+        this.recentlyClosed.set(closed);
+      });
     }
   }
 
@@ -512,13 +580,13 @@ export class App implements OnInit {
     this.editingBookmark.set(null);
   }
 
-  updateSetting(key: keyof AppSettings, value: any) {
-    this.settings.update(s => ({ ...s, [key]: value }));
+  updateSetting<Key extends keyof AppSettings>(key: Key, value: AppSettings[Key]) {
+    this.settings.update((currentSettings) => ({ ...currentSettings, [key]: value }));
   }
 
   onColumnChange(event: Event) {
     const val = (event.target as HTMLInputElement).value;
-    this.updateSetting('columns', parseInt(val));
+    this.updateSetting('columns', Number.parseInt(val, 10));
   }
 
   onBackgroundChange(event: Event) {
@@ -535,13 +603,7 @@ export class App implements OnInit {
     const backgroundImage = formData.get('backgroundImage') as string;
     const showIcon = formData.get('showIcon') === 'true';
 
-    let icon = 'https://www.google.com/s2/favicons?domain=example.com&sz=64';
-    try {
-      const hostname = new URL(url).hostname;
-      icon = `https://www.google.com/s2/favicons?domain=${hostname}&sz=64`;
-    } catch (err) {
-      console.warn('Invalid URL provided for favicon fetch');
-    }
+    const icon = buildFaviconUrl(url);
 
     const editItem = this.editingBookmark();
     if (editItem) {
