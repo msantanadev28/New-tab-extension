@@ -1,0 +1,13 @@
+{
+  "name": "new-tab-dashboard-extension",
+  "version": "1.0.0",
+  "private": true,
+  "description": "A modern Chrome new tab dashboard extension with customizable bookmarks, settings, and recent tabs.",
+  "scripts": {
+    "build:css": "tailwindcss -i ./src/styles/input.css -o ./extension/assets/tailwind.css --minify",
+    "build": "npm run build:css"
+  },
+  "devDependencies": {
+    "tailwindcss": "^3.4.17"
+  }
+}

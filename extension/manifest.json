@@ -1,0 +1,10 @@
+{
+  "manifest_version": 3,
+  "name": "Nova Dashboard",
+  "description": "A polished and customizable dashboard that replaces Chrome's default new tab page.",
+  "version": "1.0.0",
+  "permissions": ["storage", "sessions"],
+  "chrome_url_overrides": {
+    "newtab": "newtab.html"
+  }
+}
