@@ -25,6 +25,9 @@ interface AppSettings {
   showSearch: boolean;
   showIcons: boolean;
   backgroundImage?: string;
+  bgBlur: number;
+  bgRefraction: number;
+  bgDepth: number;
 }
 
 interface AppRecentlyClosedTab {
@@ -89,6 +92,9 @@ function mapSpeedDialSettings(data: SpeedDialExportModel): AppSettings {
     showSearch: true,
     showIcons: true,
     backgroundImage: activeTheme.backgroundImage || undefined,
+    bgBlur: 10,
+    bgRefraction: 40,
+    bgDepth: 80,
   };
 }
 
@@ -100,16 +106,23 @@ const INITIAL_SETTINGS = mapSpeedDialSettings(INITIAL_SPEED_DIAL_EXPORT);
   standalone: true,
   imports: [CommonModule],
   template: `
-    <div [class]="containerClass()">
+    <div [class]="containerClass() + ' relative'">
 
       <!-- Dynamic Background -->
-      <div class="fixed inset-0 -z-10 overflow-hidden pointer-events-none">
+      <div class="fixed inset-0 z-0 overflow-hidden pointer-events-none">
         @if (settings().backgroundImage) {
-          <img [src]="settings().backgroundImage" class="absolute inset-0 w-full h-full object-cover transition-opacity duration-1000" alt="" />
-          <div class="absolute inset-0 backdrop-blur-sm transition-all"
-               [class.bg-black/40]="settings().theme === 'dark'" 
-               [class.bg-white/40]="settings().theme === 'light'"></div>
+          <div class="absolute inset-0 transition-all duration-700"
+               [style.filter]="'brightness(' + settings().bgDepth + '%)'">
+            <img [src]="settings().backgroundImage" class="absolute inset-0 w-full h-full object-cover" alt="" />
+          </div>
+          <div class="absolute inset-0 transition-all duration-700"
+               [style.backdrop-filter]="'blur(' + settings().bgBlur + 'px)'"
+               [style.background-color]="settings().theme === 'dark' 
+                 ? 'rgba(0,0,0,' + (settings().bgRefraction / 100) + ')' 
+                 : 'rgba(255,255,255,' + (settings().bgRefraction / 100) + ')'">
+          </div>
         } @else {
+          <div class="absolute inset-0 bg-[#0a0a0a]" [class.bg-gray-50]="settings().theme === 'light'"></div>
           <div class="absolute -top-1/4 -left-1/4 w-1/2 h-1/2 rounded-full blur-[120px] opacity-20 transition-all"
                [class.bg-blue-600]="settings().theme === 'dark'" [class.bg-blue-400]="settings().theme === 'light'"></div>
           <div class="absolute -bottom-1/4 -right-1/4 w-1/2 h-1/2 rounded-full blur-[120px] opacity-20 transition-all"
@@ -134,7 +147,7 @@ const INITIAL_SETTINGS = mapSpeedDialSettings(INITIAL_SPEED_DIAL_EXPORT);
       </header>
 
       <!-- Main Grid Content -->
-      <main class="flex-1 flex flex-col px-6 pb-12 transition-all duration-500"
+      <main class="flex-1 flex flex-col px-6 pb-12 transition-all duration-500 relative z-10"
             [class.justify-center]="settings().centerVertically" [class.pt-20]="!settings().centerVertically">
 
         <!-- Search Bar -->
@@ -283,8 +296,31 @@ const INITIAL_SETTINGS = mapSpeedDialSettings(INITIAL_SPEED_DIAL_EXPORT);
 
             <!-- Settings View -->
             @if (isSettingsOpen()) {
+              <!-- Tabs -->
+              <div class="flex gap-6 mb-8 border-b border-white/10">
+                <button (click)="settingsTab.set('general')" 
+                  class="pb-3 text-sm font-semibold transition-all relative flex items-center gap-2"
+                  [class.opacity-40]="settingsTab() !== 'general'">
+                  <i class="w-4 h-4" data-lucide="layout"></i>
+                  General
+                  @if (settingsTab() === 'general') {
+                    <div class="absolute bottom-[-1px] left-0 right-0 h-0.5 bg-blue-500 rounded-full shadow-[0_0_8px_rgba(59,130,246,0.5)]"></div>
+                  }
+                </button>
+                <button (click)="settingsTab.set('background')" 
+                  class="pb-3 text-sm font-semibold transition-all relative flex items-center gap-2"
+                  [class.opacity-40]="settingsTab() !== 'background'">
+                  <i class="w-4 h-4" data-lucide="image"></i>
+                  Background
+                  @if (settingsTab() === 'background') {
+                    <div class="absolute bottom-[-1px] left-0 right-0 h-0.5 bg-blue-500 rounded-full shadow-[0_0_8px_rgba(59,130,246,0.5)]"></div>
+                  }
+                </button>
+              </div>
+
               <div class="space-y-8">
-                <div class="space-y-4">
+                @if (settingsTab() === 'general') {
+                  <div class="space-y-4">
                   <label class="text-sm font-medium opacity-60">Appearance Theme</label>
                   <div class="flex gap-2 p-1 rounded-2xl bg-black/10">
                     <button (click)="updateSetting('theme', 'light')"
@@ -320,13 +356,67 @@ const INITIAL_SETTINGS = mapSpeedDialSettings(INITIAL_SPEED_DIAL_EXPORT);
                          (input)="onColumnChange($event)" class="w-full accent-blue-500" />
                 </div>
 
-                <div class="space-y-4">
-                  <label class="text-sm font-medium opacity-60">Dashboard Background URL</label>
-                  <input type="text" [value]="settings().backgroundImage || ''"
-                         (input)="onBackgroundChange($event)"
-                         class="w-full p-4 rounded-2xl bg-black/10 border-none outline-none focus:ring-2 ring-blue-500/50 text-sm"
-                         placeholder="https://images.unsplash.com/..." />
-                </div>
+                  </div>
+                }
+
+                @if (settingsTab() === 'background') {
+                  <div class="space-y-6">
+                    <div class="space-y-4">
+                      <label class="text-sm font-medium opacity-60">Background Image</label>
+                      <div class="flex gap-2">
+                        <input type="text" [value]="settings().backgroundImage || ''"
+                               (input)="onBackgroundChange($event)"
+                               class="flex-1 p-4 rounded-2xl bg-black/10 border-none outline-none focus:ring-2 ring-blue-500/50 text-sm"
+                               placeholder="https://images.unsplash.com/..." />
+                        <button type="button" (click)="bgFileInput.click()" 
+                                class="p-4 rounded-2xl bg-black/10 hover:bg-black/20 transition-colors flex items-center justify-center shrink-0" 
+                                title="Upload Image">
+                          <i class="w-5 h-5" data-lucide="image-plus"></i>
+                        </button>
+                        <input type="file" #bgFileInput accept="image/*" class="hidden" (change)="onBackgroundUpload($event)" />
+                      </div>
+                    </div>
+
+                    <div class="space-y-4">
+                      <div class="flex justify-between items-center">
+                        <label class="text-xs font-bold uppercase tracking-widest opacity-40">Blur Intensity</label>
+                        <span class="text-xs font-mono bg-white/5 px-2 py-0.5 rounded-md">{{settings().bgBlur}}px</span>
+                      </div>
+                      <div class="flex items-center gap-4">
+                        <i class="w-4 h-4 opacity-30" data-lucide="droplets"></i>
+                        <input type="range" min="0" max="40" [value]="settings().bgBlur"
+                               (input)="updateSetting('bgBlur', +$any($event.target).value)" 
+                               class="flex-1 accent-blue-500 h-1.5 rounded-lg appearance-none bg-white/10 cursor-pointer" />
+                      </div>
+                    </div>
+
+                    <div class="space-y-4">
+                      <div class="flex justify-between items-center">
+                        <label class="text-xs font-bold uppercase tracking-widest opacity-40">Refraction (Opacity)</label>
+                        <span class="text-xs font-mono bg-white/5 px-2 py-0.5 rounded-md">{{settings().bgRefraction}}%</span>
+                      </div>
+                      <div class="flex items-center gap-4">
+                        <i class="w-4 h-4 opacity-30" data-lucide="layers"></i>
+                        <input type="range" min="0" max="100" [value]="settings().bgRefraction"
+                               (input)="updateSetting('bgRefraction', +$any($event.target).value)" 
+                               class="flex-1 accent-blue-500 h-1.5 rounded-lg appearance-none bg-white/10 cursor-pointer" />
+                      </div>
+                    </div>
+
+                    <div class="space-y-4">
+                      <div class="flex justify-between items-center">
+                        <label class="text-xs font-bold uppercase tracking-widest opacity-40">Depth (Exposure)</label>
+                        <span class="text-xs font-mono bg-white/5 px-2 py-0.5 rounded-md">{{settings().bgDepth}}%</span>
+                      </div>
+                      <div class="flex items-center gap-4">
+                        <i class="w-4 h-4 opacity-30" data-lucide="sun"></i>
+                        <input type="range" min="10" max="100" [value]="settings().bgDepth"
+                               (input)="updateSetting('bgDepth', +$any($event.target).value)" 
+                               class="flex-1 accent-blue-500 h-1.5 rounded-lg appearance-none bg-white/10 cursor-pointer" />
+                      </div>
+                    </div>
+                  </div>
+                }
               </div>
             }
 
@@ -414,6 +504,7 @@ export class App implements OnInit {
   tempShowIcon = signal(true);
   isSidebarHovered = signal(false);
   contextMenu = signal<{x: number, y: number, bookmark: AppBookmark} | null>(null);
+  settingsTab = signal<'general' | 'background'>('general');
 
   // Helper for settings UI
   toggleItems: { label: string, key: ToggleSettingKey }[] = [
@@ -578,6 +669,7 @@ export class App implements OnInit {
     this.isSettingsOpen.set(false);
     this.isAddModalOpen.set(false);
     this.editingBookmark.set(null);
+    this.settingsTab.set('general');
   }
 
   updateSetting<Key extends keyof AppSettings>(key: Key, value: AppSettings[Key]) {
@@ -592,6 +684,18 @@ export class App implements OnInit {
   onBackgroundChange(event: Event) {
     const val = (event.target as HTMLInputElement).value;
     this.updateSetting('backgroundImage', val);
+  }
+
+  onBackgroundUpload(event: Event) {
+    const file = (event.target as HTMLInputElement).files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const result = e.target?.result as string;
+        this.updateSetting('backgroundImage', result);
+      };
+      reader.readAsDataURL(file);
+    }
   }
 
   handleBookmarkSubmit(e: Event) {
