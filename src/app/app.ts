@@ -4,6 +4,7 @@ import { createIcons, icons } from 'lucide';
 import speedDialExportJson from '../../template/speed-dial-2-export-2026-04-18.json';
 import { environment } from '../environments/environment';
 import { SpeedDialExport, SpeedDialExportModel, type SpeedDialThemeMode } from './speed-dial.model';
+import { SupabaseService } from './services/supabase.service';
 
 declare var chrome: any;
 
@@ -167,8 +168,8 @@ const INITIAL_SETTINGS = mapSpeedDialSettings(INITIAL_SPEED_DIAL_EXPORT);
           </div>
           <div class="absolute inset-0 transition-all duration-700"
                [style.backdrop-filter]="'blur(' + settings().bgBlur + 'px)'"
-               [style.background-color]="settings().theme === 'dark' 
-                 ? 'rgba(0,0,0,' + (settings().bgRefraction / 100) + ')' 
+               [style.background-color]="settings().theme === 'dark'
+                 ? 'rgba(0,0,0,' + (settings().bgRefraction / 100) + ')'
                  : 'rgba(255,255,255,' + (settings().bgRefraction / 100) + ')'">
           </div>
         } @else {
@@ -222,7 +223,7 @@ const INITIAL_SETTINGS = mapSpeedDialSettings(INITIAL_SPEED_DIAL_EXPORT);
         <div class="w-full flex items-start">
           <!-- Horizontal Spacer Left -->
           <div [style.flex-grow]="settings().containerAlignH"></div>
-          
+
           <div
             class="animate-in slide-in-from-bottom-8 duration-700 w-fit"
             [style.display]="'grid'"
@@ -392,7 +393,7 @@ const INITIAL_SETTINGS = mapSpeedDialSettings(INITIAL_SPEED_DIAL_EXPORT);
             @if (isSettingsOpen()) {
               <!-- Tab Navigation -->
               <div class="px-8 flex space-x-8 border-b border-white/5">
-                <button (click)="settingsTab.set('general')" 
+                <button (click)="settingsTab.set('general')"
                   [class]="'flex items-center space-x-2 py-4 px-1 relative transition-all duration-300 ' +
                             (settingsTab() === 'general' ? 'text-white font-medium' : 'text-white/40 hover:text-white/60')">
                   <i class="w-4 h-4" data-lucide="layout"></i>
@@ -401,7 +402,7 @@ const INITIAL_SETTINGS = mapSpeedDialSettings(INITIAL_SPEED_DIAL_EXPORT);
                     <div class="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-500 shadow-[0_0_12px_rgba(59,130,246,0.8)]"></div>
                   }
                 </button>
-                <button (click)="settingsTab.set('dials')" 
+                <button (click)="settingsTab.set('dials')"
                   [class]="'flex items-center space-x-2 py-4 px-1 relative transition-all duration-300 ' +
                             (settingsTab() === 'dials' ? 'text-white font-medium' : 'text-white/40 hover:text-white/60')">
                   <i class="w-4 h-4" data-lucide="grid-3x3"></i>
@@ -410,7 +411,7 @@ const INITIAL_SETTINGS = mapSpeedDialSettings(INITIAL_SPEED_DIAL_EXPORT);
                     <div class="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-500 shadow-[0_0_12px_rgba(59,130,246,0.8)]"></div>
                   }
                 </button>
-                <button (click)="settingsTab.set('background')" 
+                <button (click)="settingsTab.set('background')"
                   [class]="'flex items-center space-x-2 py-4 px-1 relative transition-all duration-300 ' +
                             (settingsTab() === 'background' ? 'text-white font-medium' : 'text-white/40 hover:text-white/60')">
                   <i class="w-4 h-4" data-lucide="image"></i>
@@ -419,7 +420,7 @@ const INITIAL_SETTINGS = mapSpeedDialSettings(INITIAL_SPEED_DIAL_EXPORT);
                     <div class="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-500 shadow-[0_0_12px_rgba(59,130,246,0.8)]"></div>
                   }
                 </button>
-                <button (click)="settingsTab.set('backup')" 
+                <button (click)="settingsTab.set('backup')"
                   [class]="'flex items-center space-x-2 py-4 px-1 relative transition-all duration-300 ' +
                             (settingsTab() === 'backup' ? 'text-white font-medium' : 'text-white/40 hover:text-white/60')">
                   <i class="w-4 h-4" data-lucide="database"></i>
@@ -461,8 +462,8 @@ const INITIAL_SETTINGS = mapSpeedDialSettings(INITIAL_SPEED_DIAL_EXPORT);
                             <div class="flex items-center space-x-4">
                               <div class="p-3 bg-white/5 rounded-xl group-hover:bg-white/10 transition-colors">
                                 <i class="w-5 h-5 text-white/70" [attr.data-lucide]="
-                                  item.key === 'compactLayout' ? 'shrink' : 
-                                  item.key === 'openInNewTab' ? 'external-link' : 
+                                  item.key === 'compactLayout' ? 'shrink' :
+                                  item.key === 'openInNewTab' ? 'external-link' :
                                   item.key === 'showIcons' ? 'image-square' : 'check'
                                 "></i>
                               </div>
@@ -520,7 +521,7 @@ const INITIAL_SETTINGS = mapSpeedDialSettings(INITIAL_SPEED_DIAL_EXPORT);
                           <span class="text-xs font-mono bg-white/5 px-2.5 py-1 rounded-lg">{{settings().dialWidth}}px</span>
                         </div>
                         <input type="range" min="100" max="400" [value]="settings().dialWidth"
-                               (input)="updateSetting('dialWidth', +$any($event.target).value)" 
+                               (input)="updateSetting('dialWidth', +$any($event.target).value)"
                                class="w-full h-1.5 bg-white/10 rounded-lg appearance-none cursor-pointer accent-blue-500" />
                       </div>
                       <div class="space-y-3">
@@ -529,7 +530,7 @@ const INITIAL_SETTINGS = mapSpeedDialSettings(INITIAL_SPEED_DIAL_EXPORT);
                           <span class="text-xs font-mono bg-white/5 px-2.5 py-1 rounded-lg">{{settings().dialHeight}}px</span>
                         </div>
                         <input type="range" min="80" max="400" [value]="settings().dialHeight"
-                               (input)="updateSetting('dialHeight', +$any($event.target).value)" 
+                               (input)="updateSetting('dialHeight', +$any($event.target).value)"
                                class="w-full h-1.5 bg-white/10 rounded-lg appearance-none cursor-pointer accent-blue-500" />
                       </div>
                     </div>
@@ -540,7 +541,7 @@ const INITIAL_SETTINGS = mapSpeedDialSettings(INITIAL_SPEED_DIAL_EXPORT);
                         <span class="text-xs font-mono bg-white/5 px-2.5 py-1 rounded-lg">{{settings().dialRoundness}}px</span>
                       </div>
                       <input type="range" min="0" max="100" [value]="settings().dialRoundness"
-                             (input)="updateSetting('dialRoundness', +$any($event.target).value)" 
+                             (input)="updateSetting('dialRoundness', +$any($event.target).value)"
                              class="w-full h-1.5 bg-white/10 rounded-lg appearance-none cursor-pointer accent-blue-500" />
                     </div>
 
@@ -571,7 +572,7 @@ const INITIAL_SETTINGS = mapSpeedDialSettings(INITIAL_SPEED_DIAL_EXPORT);
                           <div class="flex items-center gap-4">
                             <i class="w-4 h-4 text-white/20" data-lucide="align-left"></i>
                             <input type="range" min="0" max="100" [value]="settings().containerAlignH"
-                                   (input)="updateSetting('containerAlignH', +$any($event.target).value)" 
+                                   (input)="updateSetting('containerAlignH', +$any($event.target).value)"
                                    class="flex-1 h-1.5 bg-white/10 rounded-lg appearance-none cursor-pointer accent-blue-500" />
                             <i class="w-4 h-4 text-white/20" data-lucide="align-right"></i>
                           </div>
@@ -584,7 +585,7 @@ const INITIAL_SETTINGS = mapSpeedDialSettings(INITIAL_SPEED_DIAL_EXPORT);
                           <div class="flex items-center gap-4">
                             <i class="w-4 h-4 text-white/20" data-lucide="arrow-up"></i>
                             <input type="range" min="0" max="100" [value]="settings().containerAlignV"
-                                   (input)="updateSetting('containerAlignV', +$any($event.target).value)" 
+                                   (input)="updateSetting('containerAlignV', +$any($event.target).value)"
                                    class="flex-1 h-1.5 bg-white/10 rounded-lg appearance-none cursor-pointer accent-blue-500" />
                             <i class="w-4 h-4 text-white/20" data-lucide="arrow-down"></i>
                           </div>
@@ -605,8 +606,8 @@ const INITIAL_SETTINGS = mapSpeedDialSettings(INITIAL_SPEED_DIAL_EXPORT);
                         </div>
                         <div class="absolute inset-0 transition-all duration-300"
                              [style.backdrop-filter]="'blur(' + settings().bgBlur + 'px)'"
-                             [style.background-color]="settings().theme === 'dark' 
-                               ? 'rgba(0,0,0,' + (settings().bgRefraction / 100) + ')' 
+                             [style.background-color]="settings().theme === 'dark'
+                               ? 'rgba(0,0,0,' + (settings().bgRefraction / 100) + ')'
                                : 'rgba(255,255,255,' + (settings().bgRefraction / 100) + ')'">
                         </div>
                       } @else {
@@ -629,7 +630,7 @@ const INITIAL_SETTINGS = mapSpeedDialSettings(INITIAL_SPEED_DIAL_EXPORT);
                                  (paste)="handleImagePaste($event, (res) => updateSetting('backgroundImage', res))"
                                  class="flex-1 p-4 rounded-2xl bg-black/40 border border-white/5 outline-none focus:ring-2 ring-blue-500/50 text-sm text-white placeholder:text-white/20"
                                  placeholder="Enter Image URL or Paste..." />
-                          <button (click)="bgFileInput.click()" 
+                          <button (click)="bgFileInput.click()"
                                   class="p-4 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 text-white transition-all shadow-xl flex items-center justify-center">
                             <i class="w-5 h-5" data-lucide="upload"></i>
                           </button>
@@ -644,7 +645,7 @@ const INITIAL_SETTINGS = mapSpeedDialSettings(INITIAL_SPEED_DIAL_EXPORT);
                             <span class="text-xs font-mono text-blue-400">{{settings().bgBlur}}px</span>
                           </div>
                           <input type="range" min="0" max="40" [value]="settings().bgBlur"
-                                 (input)="updateSetting('bgBlur', +$any($event.target).value)" 
+                                 (input)="updateSetting('bgBlur', +$any($event.target).value)"
                                  class="w-full h-1.5 bg-white/10 rounded-lg appearance-none cursor-pointer accent-blue-500" />
                         </div>
                         <div class="space-y-4">
@@ -653,7 +654,7 @@ const INITIAL_SETTINGS = mapSpeedDialSettings(INITIAL_SPEED_DIAL_EXPORT);
                             <span class="text-xs font-mono text-blue-400">{{settings().bgRefraction}}%</span>
                           </div>
                           <input type="range" min="0" max="100" [value]="settings().bgRefraction"
-                                 (input)="updateSetting('bgRefraction', +$any($event.target).value)" 
+                                 (input)="updateSetting('bgRefraction', +$any($event.target).value)"
                                  class="w-full h-1.5 bg-white/10 rounded-lg appearance-none cursor-pointer accent-blue-500" />
                         </div>
                       </div>
@@ -664,7 +665,7 @@ const INITIAL_SETTINGS = mapSpeedDialSettings(INITIAL_SPEED_DIAL_EXPORT);
                           <span class="text-xs font-mono text-blue-400">{{settings().bgDepth}}%</span>
                         </div>
                         <input type="range" min="10" max="100" [value]="settings().bgDepth"
-                               (input)="updateSetting('bgDepth', +$any($event.target).value)" 
+                               (input)="updateSetting('bgDepth', +$any($event.target).value)"
                                class="w-full h-1.5 bg-white/10 rounded-lg appearance-none cursor-pointer accent-blue-500" />
                       </div>
                     </div>
@@ -702,7 +703,7 @@ const INITIAL_SETTINGS = mapSpeedDialSettings(INITIAL_SPEED_DIAL_EXPORT);
 
                     <div class="space-y-4 pt-6 mt-6 border-t border-white/5">
                       <h3 class="text-sm font-semibold text-white/50 uppercase tracking-widest">Supabase Cloud Sync</h3>
-                      
+
                       <div class="p-8 rounded-[32px] bg-green-500/5 border border-green-500/10 flex items-center justify-between group hover:bg-green-500/10 transition-all cursor-pointer" (click)="syncToSupabase()">
                         <div class="flex items-center space-x-6">
                           <div class="p-4 bg-green-500/20 text-green-500 rounded-2xl group-hover:scale-110 transition-transform">
@@ -715,7 +716,7 @@ const INITIAL_SETTINGS = mapSpeedDialSettings(INITIAL_SPEED_DIAL_EXPORT);
                         </div>
                         <i class="w-6 h-6 text-white/20 group-hover:text-green-500 transition-colors" data-lucide="chevron-right"></i>
                       </div>
-                      
+
                       <div class="p-8 rounded-[32px] bg-yellow-500/5 border border-yellow-500/10 flex items-center justify-between group hover:bg-yellow-500/10 transition-all cursor-pointer" (click)="restoreFromSupabase()">
                         <div class="flex items-center space-x-6">
                           <div class="p-4 bg-yellow-500/20 text-yellow-500 rounded-2xl group-hover:scale-110 transition-transform">
@@ -763,7 +764,7 @@ const INITIAL_SETTINGS = mapSpeedDialSettings(INITIAL_SPEED_DIAL_EXPORT);
                       <div class="w-20 h-20 rounded-[24px] flex items-center justify-center p-4 bg-black/40 border border-white/5 relative overflow-hidden group/icon-preview">
                         <img [src]="tempBookmarkIcon() || buildFaviconUrl(editingBookmark()?.url || '')" class="w-full h-full object-contain" />
                         @if (tempBookmarkIcon()) {
-                          <button type="button" (click)="tempBookmarkIcon.set(null)" 
+                          <button type="button" (click)="tempBookmarkIcon.set(null)"
                                   class="absolute inset-0 bg-red-500/80 text-white flex items-center justify-center opacity-0 group-hover/icon-preview:opacity-100 transition-opacity">
                              <i class="w-6 h-6" data-lucide="trash-2"></i>
                           </button>
@@ -773,9 +774,9 @@ const INITIAL_SETTINGS = mapSpeedDialSettings(INITIAL_SPEED_DIAL_EXPORT);
                         <input name="icon" [value]="tempBookmarkIcon() || ''"
                                (input)="tempBookmarkIcon.set($any($event.target).value)"
                                (paste)="handleImagePaste($event, (res) => tempBookmarkIcon.set(res))"
-                               class="w-full p-3 rounded-xl bg-black/40 border border-white/5 outline-none focus:ring-2 ring-blue-500/50 text-xs text-white" 
+                               class="w-full p-3 rounded-xl bg-black/40 border border-white/5 outline-none focus:ring-2 ring-blue-500/50 text-xs text-white"
                                placeholder="Icon URL or paste image..." />
-                        <button type="button" (click)="bookmarkIconFileInput.click()" 
+                        <button type="button" (click)="bookmarkIconFileInput.click()"
                                 class="w-full py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/5 transition-all text-xs font-medium text-white">
                           Pick Icon File
                         </button>
@@ -788,11 +789,11 @@ const INITIAL_SETTINGS = mapSpeedDialSettings(INITIAL_SPEED_DIAL_EXPORT);
                     <label class="text-sm font-semibold text-white/50 uppercase tracking-widest">Background Image (Optional)</label>
                     @if (tempBookmarkBg()) {
                       <div class="relative w-full h-32 rounded-[24px] overflow-hidden group mb-2 border border-white/10 shadow-2xl bg-black/40">
-                        <div class="absolute inset-0 transition-all duration-300" 
+                        <div class="absolute inset-0 transition-all duration-300"
                              [style.filter]="'brightness(' + tempBookmarkDepth() + '%)'">
                           <img [src]="tempBookmarkBg()" class="w-full h-full object-cover" />
                         </div>
-                        <button type="button" (click)="tempBookmarkBg.set(null)" 
+                        <button type="button" (click)="tempBookmarkBg.set(null)"
                                 class="absolute top-3 right-3 p-2 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-all backdrop-blur-md z-10 shadow-lg">
                            <i class="w-4 h-4" data-lucide="trash-2"></i>
                         </button>
@@ -802,9 +803,9 @@ const INITIAL_SETTINGS = mapSpeedDialSettings(INITIAL_SPEED_DIAL_EXPORT);
                       <input name="backgroundImage" [value]="tempBookmarkBg() || ''"
                              (input)="tempBookmarkBg.set($any($event.target).value)"
                              (paste)="handleImagePaste($event, (res) => tempBookmarkBg.set(res))"
-                             class="flex-1 p-4 rounded-2xl bg-black/40 border border-white/5 outline-none focus:ring-2 ring-blue-500/50 text-sm text-white placeholder:text-white/20" 
+                             class="flex-1 p-4 rounded-2xl bg-black/40 border border-white/5 outline-none focus:ring-2 ring-blue-500/50 text-sm text-white placeholder:text-white/20"
                              placeholder="Image URL or paste image..." />
-                      <button type="button" (click)="bookmarkBgFileInput.click()" 
+                      <button type="button" (click)="bookmarkBgFileInput.click()"
                               class="p-4 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 text-white transition-all">
                         <i class="w-5 h-5" data-lucide="upload"></i>
                       </button>
@@ -909,8 +910,8 @@ export class App implements OnInit {
   filteredBrowserBookmarks = computed(() => {
     const query = this.sidebarSearchQuery().toLowerCase().trim();
     if (!query) return this.browserBookmarks();
-    return this.browserBookmarks().filter(b => 
-      b.title.toLowerCase().includes(query) || 
+    return this.browserBookmarks().filter(b =>
+      b.title.toLowerCase().includes(query) ||
       b.url?.toLowerCase().includes(query)
     );
   });
@@ -918,8 +919,8 @@ export class App implements OnInit {
   filteredRecentlyClosed = computed(() => {
     const query = this.sidebarSearchQuery().toLowerCase().trim();
     if (!query) return this.recentlyClosed();
-    return this.recentlyClosed().filter(b => 
-      b.title.toLowerCase().includes(query) || 
+    return this.recentlyClosed().filter(b =>
+      b.title.toLowerCase().includes(query) ||
       b.url?.toLowerCase().includes(query)
     );
   });
@@ -974,6 +975,8 @@ export class App implements OnInit {
   itemHover = computed(() => {
     return this.settings().theme === 'dark' ? 'hover:bg-white/10' : 'hover:bg-black/5';
   });
+
+  private supabaseService = inject(SupabaseService);
 
   gridColumns = computed(() => {
     const count = this.settings().compactLayout
@@ -1104,13 +1107,13 @@ export class App implements OnInit {
   onContextMenu(e: MouseEvent, bookmark: AppBookmark) {
     e.preventDefault();
     e.stopPropagation();
-    
+
     // Adjust position so it doesn't go off-screen
     let x = e.clientX;
     let y = e.clientY;
     const menuWidth = 192; // w-48
     const menuHeight = 100;
-    
+
     if (x + menuWidth > window.innerWidth) x -= menuWidth;
     if (y + menuHeight > window.innerHeight) y -= menuHeight;
 
@@ -1273,14 +1276,14 @@ export class App implements OnInit {
       try {
         const content = e.target?.result as string;
         const data = JSON.parse(content) as StoredAppState;
-        
+
         if (data.bookmarks) {
           this.bookmarks.set(data.bookmarks);
         }
         if (data.settings) {
           this.settings.set({ ...this.settings(), ...data.settings });
         }
-        
+
         this.closeModals();
       } catch (err) {
         console.error('Failed to import settings', err);
@@ -1293,33 +1296,13 @@ export class App implements OnInit {
   }
 
   async syncToSupabase() {
-    const { supabaseUrl, supabaseAnonKey } = getSupabaseConfig();
-
-    if (!supabaseUrl || !supabaseAnonKey) {
-      alert('Supabase credentials not configured in environment.');
-      return;
-    }
-
     const data: StoredAppState = {
       bookmarks: this.bookmarks(),
       settings: this.settings()
     };
 
     try {
-      const response = await fetch(`${supabaseUrl}/rest/v1/backups`, {
-        method: 'POST',
-        headers: {
-          'apikey': supabaseAnonKey,
-          'Authorization': `Bearer ${supabaseAnonKey}`,
-          'Content-Type': 'application/json',
-          'Prefer': 'resolution=merge-duplicates'
-        },
-        body: JSON.stringify({ id: 'default', state: data })
-      });
-
-      if (!response.ok) {
-        throw new Error(getSupabaseErrorMessage(await readSupabaseError(response)));
-      }
+      await this.supabaseService.upsertData('backups', { id: 'default', state: data });
       alert('Successfully synced to Supabase!');
     } catch (err: any) {
       console.error(err);
@@ -1328,30 +1311,12 @@ export class App implements OnInit {
   }
 
   async restoreFromSupabase() {
-    const { supabaseUrl, supabaseAnonKey } = getSupabaseConfig();
-
-    if (!supabaseUrl || !supabaseAnonKey) {
-      alert('Supabase credentials not configured in environment.');
-      return;
-    }
-
     try {
-      const response = await fetch(`${supabaseUrl}/rest/v1/backups?id=eq.default`, {
-        method: 'GET',
-        headers: {
-          'apikey': supabaseAnonKey,
-          'Authorization': `Bearer ${supabaseAnonKey}`,
-          'Content-Type': 'application/json'
-        }
-      });
+      const rows = await this.supabaseService.getTableData('backups');
+      const defaultBackup = rows?.find((r: any) => r.id === 'default');
 
-      if (!response.ok) {
-        throw new Error(getSupabaseErrorMessage(await readSupabaseError(response)));
-      }
-      
-      const rows = await response.json();
-      if (rows && rows.length > 0 && rows[0].state) {
-        const data = rows[0].state as StoredAppState;
+      if (defaultBackup && defaultBackup.state) {
+        const data = defaultBackup.state as StoredAppState;
         if (data.bookmarks) this.bookmarks.set(data.bookmarks);
         if (data.settings) this.settings.set({ ...this.settings(), ...data.settings });
         alert('Successfully restored from Supabase!');
