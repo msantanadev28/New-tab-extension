@@ -9,6 +9,7 @@
   "permissions": [
     "storage",
     "sessions",
-    "tabs"
+    "tabs",
+    "unlimitedStorage"
   ]
 }

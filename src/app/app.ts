@@ -13,6 +13,7 @@ interface AppBookmark {
   icon: string;
   backgroundImage?: string;
   showIcon?: boolean;
+  bgDepth?: number;
 }
 
 interface AppSettings {
@@ -185,8 +186,9 @@ const INITIAL_SETTINGS = mapSpeedDialSettings(INITIAL_SPEED_DIAL_EXPORT);
               >
                 <!-- Bookmark Background Image -->
                 @if (bookmark.backgroundImage) {
-                  <div class="absolute inset-0 z-0">
-                    <img [src]="bookmark.backgroundImage" class="w-full h-full object-cover opacity-40 group-hover:opacity-60 transition-opacity" alt="" />
+                  <div class="absolute inset-0 z-0 transition-all duration-500"
+                       [style.filter]="'brightness(' + (bookmark.bgDepth ?? 80) + '%)'">
+                    <img [src]="bookmark.backgroundImage" class="w-full h-full object-cover opacity-60 group-hover:opacity-80 transition-opacity" alt="" />
                     <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent"></div>
                   </div>
                 }
@@ -311,7 +313,7 @@ const INITIAL_SETTINGS = mapSpeedDialSettings(INITIAL_SPEED_DIAL_EXPORT);
                   class="pb-3 text-sm font-semibold transition-all relative flex items-center gap-2"
                   [class.opacity-40]="settingsTab() !== 'background'">
                   <i class="w-4 h-4" data-lucide="image"></i>
-                  Background
+                  Bg Settings
                   @if (settingsTab() === 'background') {
                     <div class="absolute bottom-[-1px] left-0 right-0 h-0.5 bg-blue-500 rounded-full shadow-[0_0_8px_rgba(59,130,246,0.5)]"></div>
                   }
@@ -320,99 +322,114 @@ const INITIAL_SETTINGS = mapSpeedDialSettings(INITIAL_SPEED_DIAL_EXPORT);
 
               <div class="space-y-8">
                 @if (settingsTab() === 'general') {
-                  <div class="space-y-4">
-                  <label class="text-sm font-medium opacity-60">Appearance Theme</label>
-                  <div class="flex gap-2 p-1 rounded-2xl bg-black/10">
-                    <button (click)="updateSetting('theme', 'light')"
-                      class="flex-1 flex items-center justify-center gap-2 py-2 rounded-xl transition-all"
-                      [class.bg-white]="settings().theme === 'light'" [class.text-black]="settings().theme === 'light'" [class.opacity-50]="settings().theme !== 'light'">
-                      <i class="w-4 h-4" data-lucide="sun"></i> Light
-                    </button>
-                    <button (click)="updateSetting('theme', 'dark')"
-                      class="flex-1 flex items-center justify-center gap-2 py-2 rounded-xl transition-all"
-                      [class.bg-white]="settings().theme === 'dark'" [class.text-black]="settings().theme === 'dark'" [class.opacity-50]="settings().theme !== 'dark'">
-                      <i class="w-4 h-4" data-lucide="moon"></i> Dark
-                    </button>
-                  </div>
-                </div>
-
-                <div class="space-y-4">
-                  @for (item of toggleItems; track item.key) {
-                    <div class="flex items-center justify-between">
-                      <label class="text-sm font-medium opacity-80">{{ item.label }}</label>
-                      <button (click)="updateSetting(item.key, !settings()[item.key])"
-                        class="w-12 h-6 rounded-full transition-all relative"
-                        [style.background-color]="settings()[item.key] ? '#3b82f6' : 'rgba(156, 163, 175, 0.3)'">
-                        <div class="absolute top-1 w-4 h-4 rounded-full bg-white transition-all"
-                             [style.left]="settings()[item.key] ? '1.75rem' : '0.25rem'"></div>
-                      </button>
+                  <div class="space-y-6">
+                    <div class="space-y-3">
+                      <label class="text-sm font-medium opacity-60">Appearance Theme</label>
+                      <div class="flex gap-2 p-1 rounded-2xl bg-black/10">
+                        <button (click)="updateSetting('theme', 'light')"
+                          class="flex-1 flex items-center justify-center gap-2 py-2 rounded-xl transition-all"
+                          [class.bg-white]="settings().theme === 'light'" [class.text-black]="settings().theme === 'light'" [class.opacity-50]="settings().theme !== 'light'">
+                          <i class="w-4 h-4" data-lucide="sun"></i> Light
+                        </button>
+                        <button (click)="updateSetting('theme', 'dark')"
+                          class="flex-1 flex items-center justify-center gap-2 py-2 rounded-xl transition-all"
+                          [class.bg-white]="settings().theme === 'dark'" [class.text-black]="settings().theme === 'dark'" [class.opacity-50]="settings().theme !== 'dark'">
+                          <i class="w-4 h-4" data-lucide="moon"></i> Dark
+                        </button>
+                      </div>
                     </div>
-                  }
-                </div>
 
-                <div class="space-y-4">
-                  <label class="text-sm font-medium opacity-60">Grid Columns ({{settings().columns}})</label>
-                  <input type="range" min="3" max="8" [value]="settings().columns"
-                         (input)="onColumnChange($event)" class="w-full accent-blue-500" />
-                </div>
+                    <div class="space-y-4">
+                      @for (item of toggleItems; track item.key) {
+                        <div class="flex items-center justify-between">
+                          <label class="text-sm font-medium opacity-80">{{ item.label }}</label>
+                          <button (click)="updateSetting(item.key, !settings()[item.key])"
+                            class="w-12 h-6 rounded-full transition-all relative"
+                            [style.background-color]="settings()[item.key] ? '#3b82f6' : 'rgba(156, 163, 175, 0.3)'">
+                            <div class="absolute top-1 w-4 h-4 rounded-full bg-white transition-all"
+                                 [style.left]="settings()[item.key] ? '1.75rem' : '0.25rem'"></div>
+                          </button>
+                        </div>
+                      }
+                    </div>
 
+                    <div class="space-y-3">
+                      <label class="text-sm font-medium opacity-60">Grid Columns ({{settings().columns}})</label>
+                      <input type="range" min="3" max="8" [value]="settings().columns"
+                             (input)="onColumnChange($event)" class="w-full accent-blue-500" />
+                    </div>
                   </div>
                 }
 
                 @if (settingsTab() === 'background') {
-                  <div class="space-y-6">
-                    <div class="space-y-4">
+                  <div class="space-y-4">
+                    <div class="space-y-3">
                       <label class="text-sm font-medium opacity-60">Background Image</label>
-                      <div class="flex gap-2">
-                        <input type="text" [value]="settings().backgroundImage || ''"
-                               (input)="onBackgroundChange($event)"
-                               class="flex-1 p-4 rounded-2xl bg-black/10 border-none outline-none focus:ring-2 ring-blue-500/50 text-sm"
-                               placeholder="https://images.unsplash.com/..." />
+                      <div class="space-y-3">
+                        <div class="flex gap-2">
+                          <input type="text" [value]="settings().backgroundImage || ''"
+                                 (input)="onBackgroundChange($event)"
+                                 class="flex-1 p-4 rounded-2xl bg-black/10 border-none outline-none focus:ring-2 ring-blue-500/50 text-sm"
+                                 placeholder="Image URL (e.g. Unsplash)" />
+                        </div>
+                        
                         <button type="button" (click)="bgFileInput.click()" 
-                                class="p-4 rounded-2xl bg-black/10 hover:bg-black/20 transition-colors flex items-center justify-center shrink-0" 
-                                title="Upload Image">
-                          <i class="w-5 h-5" data-lucide="image-plus"></i>
+                                class="w-full p-4 rounded-2xl bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/20 transition-all flex items-center justify-center gap-2 text-blue-500 font-medium group">
+                          <i class="w-5 h-5 group-hover:scale-110 transition-transform" data-lucide="upload"></i>
+                          Pick from file
                         </button>
                         <input type="file" #bgFileInput accept="image/*" class="hidden" (change)="onBackgroundUpload($event)" />
                       </div>
                     </div>
 
-                    <div class="space-y-4">
+                    <!-- Blur Value -->
+                    <div class="space-y-3">
                       <div class="flex justify-between items-center">
-                        <label class="text-xs font-bold uppercase tracking-widest opacity-40">Blur Intensity</label>
-                        <span class="text-xs font-mono bg-white/5 px-2 py-0.5 rounded-md">{{settings().bgBlur}}px</span>
+                        <div class="flex items-center gap-2">
+                          <i class="w-4 h-4 opacity-50" data-lucide="droplets"></i>
+                          <label class="text-sm font-semibold opacity-80">Blur Value</label>
+                        </div>
+                        <span class="text-xs font-mono bg-white/10 px-2.5 py-1 rounded-lg tabular-nums">{{settings().bgBlur}}px</span>
                       </div>
-                      <div class="flex items-center gap-4">
-                        <i class="w-4 h-4 opacity-30" data-lucide="droplets"></i>
-                        <input type="range" min="0" max="40" [value]="settings().bgBlur"
-                               (input)="updateSetting('bgBlur', +$any($event.target).value)" 
-                               class="flex-1 accent-blue-500 h-1.5 rounded-lg appearance-none bg-white/10 cursor-pointer" />
+                      <input type="range" min="0" max="40" [value]="settings().bgBlur"
+                             (input)="updateSetting('bgBlur', +$any($event.target).value)" 
+                             class="w-full accent-blue-500 h-1.5 rounded-lg appearance-none bg-white/10 cursor-pointer" />
+                      <div class="flex justify-between text-[10px] opacity-30">
+                        <span>None</span><span>Max</span>
                       </div>
                     </div>
 
-                    <div class="space-y-4">
+                    <!-- Refraction -->
+                    <div class="space-y-3">
                       <div class="flex justify-between items-center">
-                        <label class="text-xs font-bold uppercase tracking-widest opacity-40">Refraction (Opacity)</label>
-                        <span class="text-xs font-mono bg-white/5 px-2 py-0.5 rounded-md">{{settings().bgRefraction}}%</span>
+                        <div class="flex items-center gap-2">
+                          <i class="w-4 h-4 opacity-50" data-lucide="layers"></i>
+                          <label class="text-sm font-semibold opacity-80">Refraction</label>
+                        </div>
+                        <span class="text-xs font-mono bg-white/10 px-2.5 py-1 rounded-lg tabular-nums">{{settings().bgRefraction}}%</span>
                       </div>
-                      <div class="flex items-center gap-4">
-                        <i class="w-4 h-4 opacity-30" data-lucide="layers"></i>
-                        <input type="range" min="0" max="100" [value]="settings().bgRefraction"
-                               (input)="updateSetting('bgRefraction', +$any($event.target).value)" 
-                               class="flex-1 accent-blue-500 h-1.5 rounded-lg appearance-none bg-white/10 cursor-pointer" />
+                      <input type="range" min="0" max="100" [value]="settings().bgRefraction"
+                             (input)="updateSetting('bgRefraction', +$any($event.target).value)" 
+                             class="w-full accent-blue-500 h-1.5 rounded-lg appearance-none bg-white/10 cursor-pointer" />
+                      <div class="flex justify-between text-[10px] opacity-30">
+                        <span>Transparent</span><span>Opaque</span>
                       </div>
                     </div>
 
-                    <div class="space-y-4">
+                    <!-- Depth -->
+                    <div class="space-y-3">
                       <div class="flex justify-between items-center">
-                        <label class="text-xs font-bold uppercase tracking-widest opacity-40">Depth (Exposure)</label>
-                        <span class="text-xs font-mono bg-white/5 px-2 py-0.5 rounded-md">{{settings().bgDepth}}%</span>
+                        <div class="flex items-center gap-2">
+                          <i class="w-4 h-4 opacity-50" data-lucide="sun"></i>
+                          <label class="text-sm font-semibold opacity-80">Depth</label>
+                        </div>
+                        <span class="text-xs font-mono bg-white/10 px-2.5 py-1 rounded-lg tabular-nums">{{settings().bgDepth}}%</span>
                       </div>
-                      <div class="flex items-center gap-4">
-                        <i class="w-4 h-4 opacity-30" data-lucide="sun"></i>
-                        <input type="range" min="10" max="100" [value]="settings().bgDepth"
-                               (input)="updateSetting('bgDepth', +$any($event.target).value)" 
-                               class="flex-1 accent-blue-500 h-1.5 rounded-lg appearance-none bg-white/10 cursor-pointer" />
+                      <input type="range" min="10" max="100" [value]="settings().bgDepth"
+                             (input)="updateSetting('bgDepth', +$any($event.target).value)" 
+                             class="w-full accent-blue-500 h-1.5 rounded-lg appearance-none bg-white/10 cursor-pointer" />
+                      <div class="flex justify-between text-[10px] opacity-30">
+                        <span>Dark</span><span>Bright</span>
                       </div>
                     </div>
                   </div>
@@ -433,11 +450,43 @@ const INITIAL_SETTINGS = mapSpeedDialSettings(INITIAL_SPEED_DIAL_EXPORT);
                   <input name="url" [value]="editingBookmark()?.url || ''" required type="url"
                          class="w-full p-4 rounded-2xl bg-black/10 border-none outline-none focus:ring-2 ring-blue-500/50" placeholder="https://..." />
                 </div>
-                <div class="space-y-2">
-                  <label class="text-sm font-medium opacity-60">Background Image URL (Optional)</label>
-                  <input name="backgroundImage" [value]="editingBookmark()?.backgroundImage || ''"
-                         class="w-full p-4 rounded-2xl bg-black/10 border-none outline-none focus:ring-2 ring-blue-500/50" placeholder="https://images.unsplash.com/..." />
+                <div class="space-y-3">
+                  <label class="text-sm font-medium opacity-60">Background Image (Optional)</label>
+                  <div class="space-y-3">
+                    @if (tempBookmarkBg()) {
+                      <div class="relative w-full h-32 rounded-2xl overflow-hidden group mb-2 border border-white/10 shadow-inner">
+                        <img [src]="tempBookmarkBg()" class="w-full h-full object-cover" />
+                        <button type="button" (click)="tempBookmarkBg.set(null)" 
+                                class="absolute top-2 right-2 p-1.5 bg-red-500/80 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity backdrop-blur-md">
+                           <i class="w-4 h-4" data-lucide="trash-2"></i>
+                        </button>
+                      </div>
+                    }
+                    <input name="backgroundImage" [value]="tempBookmarkBg() || ''"
+                           (input)="tempBookmarkBg.set($any($event.target).value)"
+                           class="w-full p-4 rounded-2xl bg-black/10 border-none outline-none focus:ring-2 ring-blue-500/50 text-sm" 
+                           placeholder="https://images.unsplash.com/..." />
+                           
+                    <button type="button" (click)="bookmarkBgFileInput.click()" 
+                            class="w-full p-4 rounded-2xl bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/20 transition-all flex items-center justify-center gap-2 text-blue-500 font-medium group text-sm">
+                      <i class="w-4 h-4 group-hover:scale-110 transition-transform" data-lucide="upload"></i>
+                      Pick from file
+                    </button>
+                    <input type="file" #bookmarkBgFileInput accept="image/*" class="hidden" (change)="onBookmarkBgUpload($event)" />
+                  </div>
                 </div>
+
+                @if (tempBookmarkBg()) {
+                  <div class="space-y-3">
+                    <div class="flex justify-between items-center">
+                      <label class="text-xs font-semibold opacity-60 uppercase tracking-wider">Image Depth</label>
+                      <span class="text-xs font-mono bg-white/10 px-2 py-0.5 rounded-lg">{{tempBookmarkDepth()}}%</span>
+                    </div>
+                    <input type="range" min="10" max="100" [value]="tempBookmarkDepth()"
+                           (input)="tempBookmarkDepth.set(+$any($event.target).value)"
+                           class="w-full accent-blue-500 h-1.5 rounded-lg appearance-none bg-white/10 cursor-pointer" />
+                  </div>
+                }
 
                 <div class="space-y-4 pt-2">
                   <div class="flex items-center justify-between">
@@ -505,6 +554,8 @@ export class App implements OnInit {
   isSidebarHovered = signal(false);
   contextMenu = signal<{x: number, y: number, bookmark: AppBookmark} | null>(null);
   settingsTab = signal<'general' | 'background'>('general');
+  tempBookmarkBg = signal<string | null>(null);
+  tempBookmarkDepth = signal<number>(80);
 
   // Helper for settings UI
   toggleItems: { label: string, key: ToggleSettingKey }[] = [
@@ -656,12 +707,16 @@ export class App implements OnInit {
   openAddModal() {
     this.editingBookmark.set(null);
     this.tempShowIcon.set(true);
+    this.tempBookmarkBg.set(null);
+    this.tempBookmarkDepth.set(80);
     this.isAddModalOpen.set(true);
   }
 
   openEditModal(bookmark: AppBookmark) {
     this.editingBookmark.set(bookmark);
     this.tempShowIcon.set(bookmark.showIcon !== false);
+    this.tempBookmarkBg.set(bookmark.backgroundImage || null);
+    this.tempBookmarkDepth.set(bookmark.bgDepth ?? 80);
     this.isAddModalOpen.set(true);
   }
 
@@ -669,6 +724,8 @@ export class App implements OnInit {
     this.isSettingsOpen.set(false);
     this.isAddModalOpen.set(false);
     this.editingBookmark.set(null);
+    this.tempBookmarkBg.set(null);
+    this.tempBookmarkDepth.set(80);
     this.settingsTab.set('general');
   }
 
@@ -698,6 +755,18 @@ export class App implements OnInit {
     }
   }
 
+  onBookmarkBgUpload(event: Event) {
+    const file = (event.target as HTMLInputElement).files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const result = e.target?.result as string;
+        this.tempBookmarkBg.set(result);
+      };
+      reader.readAsDataURL(file);
+    }
+  }
+
   handleBookmarkSubmit(e: Event) {
     e.preventDefault();
     const form = e.target as HTMLFormElement;
@@ -710,10 +779,13 @@ export class App implements OnInit {
     const icon = buildFaviconUrl(url);
 
     const editItem = this.editingBookmark();
+    const finalBg = this.tempBookmarkBg() || backgroundImage;
+    const finalDepth = this.tempBookmarkDepth();
+
     if (editItem) {
-      this.bookmarks.update(prev => prev.map(b => b.id === editItem.id ? { ...b, title, url, icon, backgroundImage, showIcon } : b));
+      this.bookmarks.update(prev => prev.map(b => b.id === editItem.id ? { ...b, title, url, icon, backgroundImage: finalBg, showIcon, bgDepth: finalDepth } : b));
     } else {
-      this.bookmarks.update(prev => [...prev, { id: Date.now().toString(), title, url, icon, backgroundImage, showIcon }]);
+      this.bookmarks.update(prev => [...prev, { id: Date.now().toString(), title, url, icon, backgroundImage: finalBg, showIcon, bgDepth: finalDepth }]);
     }
     this.closeModals();
   }
