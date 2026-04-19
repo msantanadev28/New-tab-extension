@@ -10,6 +10,7 @@
     "storage",
     "sessions",
     "tabs",
+    "bookmarks",
     "unlimitedStorage"
   ]
 }

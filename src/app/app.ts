@@ -268,30 +268,48 @@ const INITIAL_SETTINGS = mapSpeedDialSettings(INITIAL_SPEED_DIAL_EXPORT);
 
       <!-- Hidden Sidebar -->
       <aside
-        class="fixed top-4 right-4 bottom-4 w-80 z-50 transition-all duration-500 transform rounded-[2.5rem] p-8 flex flex-col"
+        class="fixed top-24 right-4 bottom-4 w-72 z-50 transition-all duration-500 transform rounded-[2.5rem] p-6 flex flex-col"
         [class]="glassEffect()"
         [class.translate-x-0]="isSidebarHovered()"
         [class.translate-x-full]="!isSidebarHovered()"
         [style.transform]="isSidebarHovered() ? 'translateX(0)' : 'translateX(calc(100% + 24px))'"
         (mouseleave)="isSidebarHovered.set(false)"
       >
-        <div class="flex items-center justify-between mb-8">
+        <div class="flex items-center justify-between mb-6">
           <div class="flex items-center gap-2">
             <i class="w-4 h-4 text-blue-500" data-lucide="bookmark"></i>
-            <h3 class="font-semibold text-lg">Quick Access</h3>
+            <h3 class="font-semibold text-base">Quick Access</h3>
           </div>
           <button (click)="isSidebarHovered.set(false)" class="opacity-40 hover:opacity-100">
             <i class="w-5 h-5" data-lucide="chevron-right"></i>
           </button>
         </div>
 
+        <!-- Sidebar Search -->
+        <div class="relative mb-6">
+          <div class="flex items-center gap-3 px-4 py-3 rounded-2xl bg-black/10 border border-white/5 focus-within:ring-2 ring-blue-500/50 transition-all">
+            <i class="w-4 h-4 opacity-40" data-lucide="search"></i>
+            <input
+              type="text"
+              placeholder="Search..."
+              class="bg-transparent outline-none w-full text-xs placeholder:opacity-30"
+              [value]="sidebarSearchQuery()"
+              (input)="sidebarSearchQuery.set($any($event.target).value)"
+            />
+          </div>
+        </div>
+
         <div class="flex-1 overflow-y-auto pr-2 custom-scrollbar">
           <section class="mb-10">
-            <h4 class="text-xs font-bold uppercase tracking-wider opacity-40 mb-4 px-2">Bookmarks</h4>
+            <h4 class="text-[10px] font-bold uppercase tracking-wider opacity-40 mb-4 px-2">Bookmarks</h4>
             <div class="space-y-1">
-              @for (b of bookmarks(); track b.id) {
+              @for (b of filteredBrowserBookmarks(); track $index) {
                 <a [href]="b.url" class="flex items-center gap-3 p-3 rounded-2xl" [class]="itemHover()">
-                  <img [src]="b.icon" class="w-5 h-5" alt="" />
+                  @if (b.icon) {
+                    <img [src]="b.icon" class="w-5 h-5" alt="" />
+                  } @else {
+                    <i class="w-4 h-4 opacity-30" data-lucide="bookmark"></i>
+                  }
                   <span class="text-sm truncate flex-1">{{ b.title }}</span>
                 </a>
               }
@@ -300,11 +318,11 @@ const INITIAL_SETTINGS = mapSpeedDialSettings(INITIAL_SPEED_DIAL_EXPORT);
 
           @if (recentlyClosed().length > 0) {
             <section>
-              <h4 class="text-xs font-bold uppercase tracking-wider opacity-40 mb-4 px-2 flex items-center gap-2">
+              <h4 class="text-[10px] font-bold uppercase tracking-wider opacity-40 mb-4 px-2 flex items-center gap-2">
                 <i class="w-3 h-3" data-lucide="history"></i> Recently Closed
               </h4>
               <div class="space-y-1">
-                @for (tab of recentlyClosed(); track $index) {
+                @for (tab of filteredRecentlyClosed(); track $index) {
                   <a [href]="tab.url" class="flex items-center gap-3 p-3 rounded-2xl" [class]="itemHover()">
                     @if (tab.icon) {
                        <img [src]="tab.icon" class="w-5 h-5" alt="" />
@@ -749,6 +767,27 @@ export class App implements OnInit {
   // --- Signals (State) ---
   bookmarks = signal<AppBookmark[]>(INITIAL_BOOKMARKS);
   recentlyClosed = signal<AppRecentlyClosedTab[]>([]);
+  browserBookmarks = signal<AppRecentlyClosedTab[]>([]);
+  sidebarSearchQuery = signal('');
+
+  filteredBrowserBookmarks = computed(() => {
+    const query = this.sidebarSearchQuery().toLowerCase().trim();
+    if (!query) return this.browserBookmarks();
+    return this.browserBookmarks().filter(b => 
+      b.title.toLowerCase().includes(query) || 
+      b.url?.toLowerCase().includes(query)
+    );
+  });
+
+  filteredRecentlyClosed = computed(() => {
+    const query = this.sidebarSearchQuery().toLowerCase().trim();
+    if (!query) return this.recentlyClosed();
+    return this.recentlyClosed().filter(b => 
+      b.title.toLowerCase().includes(query) || 
+      b.url?.toLowerCase().includes(query)
+    );
+  });
+
   settings = signal<AppSettings>(INITIAL_SETTINGS);
   storageHydrated = signal(false);
 
@@ -838,6 +877,17 @@ export class App implements OnInit {
         if (!(e.target as HTMLElement).closest('a')) {
           this.closeContextMenu();
         }
+      });
+    }
+
+    if (chrome.bookmarks) {
+      chrome.bookmarks.getRecent(40, (bookmarks: any[]) => {
+        const mapped = bookmarks.map(b => ({
+          title: b.title,
+          url: b.url,
+          icon: buildFaviconUrl(b.url || '')
+        }));
+        this.browserBookmarks.set(mapped);
       });
     }
   }
