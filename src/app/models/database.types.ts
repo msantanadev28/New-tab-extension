@@ -27,6 +27,7 @@ export interface UserSettings {
   search_engine_url: string | null;
   theme_mode: string | null;
   custom_background_url: string | null;
+  columns: number | null;
   updated_at: string | null;
 }
 

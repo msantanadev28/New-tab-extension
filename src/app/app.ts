@@ -1,6 +1,8 @@
 import { Component, signal, computed, effect, inject, PLATFORM_ID, OnInit } from '@angular/core';
 import { CommonModule, isPlatformBrowser } from '@angular/common';
 import { createIcons, icons } from 'lucide';
+import { LottieComponent, AnimationOptions } from 'ngx-lottie';
+import { NgxSonnerToaster, toast } from 'ngx-sonner';
 import speedDialExportJson from '../../template/speed-dial-2-export-2026-04-18.json';
 import { environment } from '../environments/environment';
 import { SpeedDialExport, SpeedDialExportModel, type SpeedDialThemeMode } from './speed-dial.model';
@@ -155,9 +157,10 @@ const INITIAL_SETTINGS = mapSpeedDialSettings(INITIAL_SPEED_DIAL_EXPORT);
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, LottieComponent, NgxSonnerToaster],
   template: `
     <div [class]="containerClass() + ' relative'">
+      <ngx-sonner-toaster />
 
       <!-- Dynamic Background -->
       <div class="fixed inset-0 z-0 overflow-hidden pointer-events-none">
@@ -497,7 +500,7 @@ const INITIAL_SETTINGS = mapSpeedDialSettings(INITIAL_SPEED_DIAL_EXPORT);
                         <input
                           type="range"
                           min="3"
-                          max="8"
+                          max="12"
                           [value]="settings().columns"
                           (input)="onColumnChange($event)"
                           class="w-full h-1.5 bg-white/10 rounded-lg appearance-none cursor-pointer accent-blue-500"
@@ -505,7 +508,7 @@ const INITIAL_SETTINGS = mapSpeedDialSettings(INITIAL_SPEED_DIAL_EXPORT);
                         />
                         <div class="flex justify-between mt-2 text-[10px] text-white/30 font-bold px-1">
                           <span>3 COL</span>
-                          <span>8 COL</span>
+                          <span>12 COL</span>
                         </div>
                       </div>
                     </section>
@@ -869,6 +872,17 @@ const INITIAL_SETTINGS = mapSpeedDialSettings(INITIAL_SPEED_DIAL_EXPORT);
         </div>
       }
 
+      <!-- Cloud Sync Overlay -->
+      @if (isSyncing()) {
+        <div class="fixed inset-0 z-[200] flex flex-col items-center justify-center p-4 bg-black/80 backdrop-blur-xl animate-in fade-in duration-300">
+          <div class="w-64 h-64 flex items-center justify-center relative mb-4">
+               <ng-lottie [options]="lottieOptions"></ng-lottie>
+          </div>
+          <h2 class="text-2xl font-bold text-white tracking-widest uppercase mb-2">{{ syncMessage() }}</h2>
+          <p class="text-white/50 text-sm">Please wait while your data is securely synchronized...</p>
+        </div>
+      }
+
     </div>
   `,
   styles: [`
@@ -940,9 +954,16 @@ export class App implements OnInit {
   tempBookmarkDepth = signal<number>(80);
   buildFaviconUrl = buildFaviconUrl;
 
+  isSyncing = signal(false);
+  syncMessage = signal('Syncing to Cloud...');
+
+  lottieOptions: AnimationOptions = {
+    path: 'sync-animation.json',
+  };
+
   sliderBackground = computed(() => {
-    // We use settings().columns which is 3-8 range
-    const val = ((this.settings().columns - 3) / 5) * 100;
+    // We use settings().columns which is 3-12 range
+    const val = ((this.settings().columns - 3) / 9) * 100;
     return `linear-gradient(to right, #3b82f6 0%, #3b82f6 ${val}%, rgba(255,255,255,0.1) ${val}%, rgba(255,255,255,0.1) 100%)`;
   });
 
@@ -980,7 +1001,7 @@ export class App implements OnInit {
 
   gridColumns = computed(() => {
     const count = this.settings().compactLayout
-      ? Math.min(this.settings().columns + 2, 8)
+      ? Math.min(this.settings().columns + 2, 12)
       : this.settings().columns;
     return `repeat(${count}, ${this.settings().dialWidth}px)`;
   });
@@ -1287,7 +1308,7 @@ export class App implements OnInit {
         this.closeModals();
       } catch (err) {
         console.error('Failed to import settings', err);
-        alert('Failed to import settings. Please make sure the file is a valid JSON backup.');
+        toast.error('Failed to import settings. Please make sure the file is a valid JSON backup.');
       }
     };
     reader.readAsText(file);
@@ -1326,10 +1347,15 @@ export class App implements OnInit {
       theme_mode: settings.theme,
       bg_depth: settings.bgDepth,
       custom_background_url: settings.backgroundImage || null,
+      columns: settings.columns,
     };
   }
 
   async syncToSupabase() {
+    this.syncMessage.set('Syncing to Cloud...');
+    this.isSyncing.set(true);
+    let toastMessage: string | null = null;
+    let toastType: 'success' | 'error' | null = null;
     try {
       const dbSettings = this.mapSettingsToDb(this.settings());
       const dbBookmarks = this.bookmarks().map(bm => this.mapBookmarkToDb(bm));
@@ -1340,14 +1366,28 @@ export class App implements OnInit {
       const { error: bookmarksError } = await this.supabaseService.upsertRows('bookmarks', dbBookmarks);
       if (bookmarksError) throw bookmarksError;
 
-      alert('Successfully synced to Supabase Cloud!');
+      // Small delay to let the animation show properly if it was fast
+      await new Promise(r => setTimeout(r, 1500));
+      toastMessage = 'Successfully synced to Supabase Cloud!';
+      toastType = 'success';
     } catch (err: any) {
       console.error(err);
-      alert('Failed to sync to Supabase: ' + getSupabaseErrorMessage(err));
+      toastMessage = 'Failed to sync to Supabase: ' + getSupabaseErrorMessage(err);
+      toastType = 'error';
+    } finally {
+      this.isSyncing.set(false);
+    }
+
+    if (toastMessage && toastType) {
+      toast[toastType](toastMessage);
     }
   }
 
   async restoreFromSupabase() {
+    this.syncMessage.set('Restoring from Cloud...');
+    this.isSyncing.set(true);
+    let toastMessage: string | null = null;
+    let toastType: 'success' | 'error' | null = null;
     try {
       // Get settings (id 1)
       const { data: settingsData, error: settingsError } = await this.supabaseService.getRowById('user_settings', 1);
@@ -1359,6 +1399,7 @@ export class App implements OnInit {
           theme: (settingsData.theme_mode as any) || this.settings().theme,
           bgDepth: settingsData.bg_depth || this.settings().bgDepth,
           backgroundImage: settingsData.custom_background_url || this.settings().backgroundImage,
+          columns: settingsData.columns ?? this.settings().columns,
         });
       }
 
@@ -1370,10 +1411,19 @@ export class App implements OnInit {
         this.bookmarks.set(bookmarksData.map(db => this.mapDbToBookmark(db)));
       }
 
-      alert('Successfully restored from Supabase Cloud!');
+      await new Promise(r => setTimeout(r, 1500));
+      toastMessage = 'Successfully restored from Supabase Cloud!';
+      toastType = 'success';
     } catch (err: any) {
       console.error(err);
-      alert('Failed to restore from Supabase: ' + getSupabaseErrorMessage(err));
+      toastMessage = 'Failed to restore from Supabase: ' + getSupabaseErrorMessage(err);
+      toastType = 'error';
+    } finally {
+      this.isSyncing.set(false);
+    }
+
+    if (toastMessage && toastType) {
+      toast[toastType](toastMessage);
     }
   }
 }

@@ -133,6 +133,12 @@
         "default": null
       },
       {
+        "column": "columns",
+        "type": "integer",
+        "nullable": "YES",
+        "default": "8"
+      },
+      {
         "column": "updated_at",
         "type": "timestamp with time zone",
         "nullable": "YES",
