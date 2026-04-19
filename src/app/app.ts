@@ -381,6 +381,15 @@ const INITIAL_SETTINGS = mapSpeedDialSettings(INITIAL_SPEED_DIAL_EXPORT);
                     <div class="absolute bottom-[-1px] left-0 right-0 h-0.5 bg-blue-500 rounded-full shadow-[0_0_8px_rgba(59,130,246,0.5)]"></div>
                   }
                 </button>
+                <button (click)="settingsTab.set('backup')" 
+                  class="pb-3 text-sm font-semibold transition-all relative flex items-center gap-2"
+                  [class.opacity-40]="settingsTab() !== 'backup'">
+                  <i class="w-4 h-4" data-lucide="database"></i>
+                  Backup
+                  @if (settingsTab() === 'backup') {
+                    <div class="absolute bottom-[-1px] left-0 right-0 h-0.5 bg-blue-500 rounded-full shadow-[0_0_8px_rgba(59,130,246,0.5)]"></div>
+                  }
+                </button>
               </div>
 
               <div class="space-y-8">
@@ -563,8 +572,9 @@ const INITIAL_SETTINGS = mapSpeedDialSettings(INITIAL_SPEED_DIAL_EXPORT);
                         <div class="flex gap-2">
                           <input type="text" [value]="settings().backgroundImage || ''"
                                  (input)="onBackgroundChange($event)"
+                                 (paste)="handleImagePaste($event, (res) => updateSetting('backgroundImage', res))"
                                  class="flex-1 p-4 rounded-2xl bg-black/10 border-none outline-none focus:ring-2 ring-blue-500/50 text-sm"
-                                 placeholder="Image URL (e.g. Unsplash)" />
+                                 placeholder="Image URL or paste image..." />
                         </div>
                         
                         <button type="button" (click)="bgFileInput.click()" 
@@ -628,6 +638,43 @@ const INITIAL_SETTINGS = mapSpeedDialSettings(INITIAL_SPEED_DIAL_EXPORT);
                     </div>
                   </div>
                 }
+
+                @if (settingsTab() === 'backup') {
+                  <div class="space-y-8 py-4">
+                    <div class="p-6 rounded-3xl bg-blue-500/5 border border-blue-500/10 space-y-4">
+                      <div class="flex items-center gap-3">
+                        <div class="p-2 rounded-xl bg-blue-500/20 text-blue-500">
+                          <i class="w-5 h-5" data-lucide="download"></i>
+                        </div>
+                        <div>
+                          <h4 class="font-semibold text-sm">Export Data</h4>
+                          <p class="text-xs opacity-50">Save your bookmarks and settings to a JSON file</p>
+                        </div>
+                      </div>
+                      <button (click)="exportSettings()" 
+                              class="w-full py-3 bg-blue-500 hover:bg-blue-600 text-white font-medium rounded-2xl transition-all shadow-lg shadow-blue-500/20 flex items-center justify-center gap-2">
+                        Export Backup
+                      </button>
+                    </div>
+
+                    <div class="p-6 rounded-3xl bg-purple-500/5 border border-purple-500/10 space-y-4">
+                      <div class="flex items-center gap-3">
+                        <div class="p-2 rounded-xl bg-purple-500/20 text-purple-500">
+                          <i class="w-5 h-5" data-lucide="upload"></i>
+                        </div>
+                        <div>
+                          <h4 class="font-semibold text-sm">Import Data</h4>
+                          <p class="text-xs opacity-50">Restore from a previous JSON backup file</p>
+                        </div>
+                      </div>
+                      <button (click)="importFileInput.click()" 
+                              class="w-full py-3 bg-purple-500 hover:bg-purple-600 text-white font-medium rounded-2xl transition-all shadow-lg shadow-purple-500/20 flex items-center justify-center gap-2">
+                        Import Backup
+                      </button>
+                      <input type="file" #importFileInput accept=".json" class="hidden" (change)="importSettings($event)" />
+                    </div>
+                  </div>
+                }
               </div>
             }
 
@@ -636,7 +683,7 @@ const INITIAL_SETTINGS = mapSpeedDialSettings(INITIAL_SPEED_DIAL_EXPORT);
               <form (submit)="handleBookmarkSubmit($event)" class="space-y-6">
                 <div class="space-y-2">
                   <label class="text-sm font-medium opacity-60">Site Name</label>
-                  <input name="title" [value]="editingBookmark()?.title || ''" required
+                  <input name="title" [value]="editingBookmark()?.title || ''"
                          class="w-full p-4 rounded-2xl bg-black/10 border-none outline-none focus:ring-2 ring-blue-500/50" placeholder="e.g. GitHub" />
                 </div>
                 <div class="space-y-2">
@@ -660,8 +707,9 @@ const INITIAL_SETTINGS = mapSpeedDialSettings(INITIAL_SPEED_DIAL_EXPORT);
                     <div class="flex-1 space-y-2">
                       <input name="icon" [value]="tempBookmarkIcon() || ''"
                              (input)="tempBookmarkIcon.set($any($event.target).value)"
+                             (paste)="handleImagePaste($event, (res) => tempBookmarkIcon.set(res))"
                              class="w-full p-3 rounded-xl bg-black/10 border-none outline-none focus:ring-2 ring-blue-500/50 text-xs" 
-                             placeholder="Icon URL..." />
+                             placeholder="Icon URL or paste image..." />
                       <button type="button" (click)="bookmarkIconFileInput.click()" 
                               class="w-full py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/5 transition-all flex items-center justify-center gap-2 text-xs font-medium">
                         <i class="w-3.5 h-3.5" data-lucide="upload"></i> Pick Icon File
@@ -687,8 +735,9 @@ const INITIAL_SETTINGS = mapSpeedDialSettings(INITIAL_SPEED_DIAL_EXPORT);
                     }
                     <input name="backgroundImage" [value]="tempBookmarkBg() || ''"
                            (input)="tempBookmarkBg.set($any($event.target).value)"
+                           (paste)="handleImagePaste($event, (res) => tempBookmarkBg.set(res))"
                            class="w-full p-4 rounded-2xl bg-black/10 border-none outline-none focus:ring-2 ring-blue-500/50 text-sm" 
-                           placeholder="https://images.unsplash.com/..." />
+                           placeholder="Image URL or paste image..." />
                            
                     <button type="button" (click)="bookmarkBgFileInput.click()" 
                             class="w-full p-4 rounded-2xl bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/20 transition-all flex items-center justify-center gap-2 text-blue-500 font-medium group text-sm">
@@ -797,7 +846,7 @@ export class App implements OnInit {
   tempShowIcon = signal(true);
   isSidebarHovered = signal(false);
   contextMenu = signal<{x: number, y: number, bookmark: AppBookmark} | null>(null);
-  settingsTab = signal<'general' | 'background' | 'dials'>('general');
+  settingsTab = signal<'general' | 'background' | 'dials' | 'backup'>('general');
   tempBookmarkBg = signal<string | null>(null);
   tempBookmarkIcon = signal<string | null>(null);
   tempBookmarkDepth = signal<number>(80);
@@ -1050,6 +1099,28 @@ export class App implements OnInit {
     }
   }
 
+  handleImagePaste(event: ClipboardEvent, callback: (result: string) => void) {
+    const items = event.clipboardData?.items;
+    if (!items) return;
+
+    for (let i = 0; i < items.length; i++) {
+      if (items[i].type.indexOf('image') !== -1) {
+        const file = items[i].getAsFile();
+        if (file) {
+          const reader = new FileReader();
+          reader.onload = (e) => {
+            const result = e.target?.result as string;
+            callback(result);
+          };
+          reader.readAsDataURL(file);
+          // Prevent the default paste if it's an image
+          event.preventDefault();
+        }
+        break;
+      }
+    }
+  }
+
   onBookmarkIconUpload(event: Event) {
     const file = (event.target as HTMLInputElement).files?.[0];
     if (file) {
@@ -1084,6 +1155,48 @@ export class App implements OnInit {
       this.bookmarks.update(prev => [...prev, { id: Date.now().toString(), title, url, icon: finalIcon, backgroundImage: finalBg, showIcon, bgDepth: finalDepth }]);
     }
     this.closeModals();
+  }
+
+  exportSettings() {
+    const data: StoredAppState = {
+      bookmarks: this.bookmarks(),
+      settings: this.settings()
+    };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `new-tab-backup-${new Date().toISOString().split('T')[0]}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  importSettings(event: Event) {
+    const file = (event.target as HTMLInputElement).files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const content = e.target?.result as string;
+        const data = JSON.parse(content) as StoredAppState;
+        
+        if (data.bookmarks) {
+          this.bookmarks.set(data.bookmarks);
+        }
+        if (data.settings) {
+          this.settings.set({ ...this.settings(), ...data.settings });
+        }
+        
+        this.closeModals();
+      } catch (err) {
+        console.error('Failed to import settings', err);
+        alert('Failed to import settings. Please make sure the file is a valid JSON backup.');
+      }
+    };
+    reader.readAsText(file);
+    // Reset the input value so the same file can be selected again
+    (event.target as HTMLInputElement).value = '';
   }
 }
 
