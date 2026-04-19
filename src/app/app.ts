@@ -33,8 +33,8 @@ interface AppSettings {
   dialWidth: number;
   dialHeight: number;
   dialRoundness: number;
-  containerAlignH: 'left' | 'center' | 'right';
-  containerAlignV: 'top' | 'center' | 'bottom';
+  containerAlignH: number;
+  containerAlignV: number;
 }
 
 interface AppRecentlyClosedTab {
@@ -106,8 +106,8 @@ function mapSpeedDialSettings(data: SpeedDialExportModel): AppSettings {
     dialWidth: 180,
     dialHeight: 180,
     dialRoundness: 32,
-    containerAlignH: 'center',
-    containerAlignV: 'center',
+    containerAlignH: 50,
+    containerAlignV: 50,
   };
 }
 
@@ -160,11 +160,9 @@ const INITIAL_SETTINGS = mapSpeedDialSettings(INITIAL_SPEED_DIAL_EXPORT);
       </header>
 
       <!-- Main Grid Content -->
-      <main class="flex-1 flex flex-col px-6 pb-12 transition-all duration-500 relative z-10 overflow-y-auto"
-            [class.justify-center]="settings().containerAlignV === 'center'"
-            [class.justify-start]="settings().containerAlignV === 'top'"
-            [class.justify-end]="settings().containerAlignV === 'bottom'"
-            [style.padding-top.px]="settings().containerAlignV === 'top' ? 120 : (settings().containerAlignV === 'center' ? 0 : 0)">
+      <main class="flex-1 flex flex-col px-6 pb-12 transition-all duration-500 relative z-10 overflow-y-auto">
+        <!-- Vertical Spacer Top -->
+        <div [style.flex-grow]="settings().containerAlignV"></div>
 
         <!-- Search Bar -->
 <!--         @if (settings().showSearch) {
@@ -183,11 +181,11 @@ const INITIAL_SETTINGS = mapSpeedDialSettings(INITIAL_SPEED_DIAL_EXPORT);
           </div>
         } -->
 
-        <!-- Bookmark Grid -->
-        <div class="w-full flex"
-             [class.justify-center]="settings().containerAlignH === 'center'"
-             [class.justify-start]="settings().containerAlignH === 'left'"
-             [class.justify-end]="settings().containerAlignH === 'right'">
+        <!-- Bookmark Grid Wrapper -->
+        <div class="w-full flex items-start">
+          <!-- Horizontal Spacer Left -->
+          <div [style.flex-grow]="settings().containerAlignH"></div>
+          
           <div
             class="animate-in slide-in-from-bottom-8 duration-700 w-fit"
             [style.display]="'grid'"
@@ -253,7 +251,12 @@ const INITIAL_SETTINGS = mapSpeedDialSettings(INITIAL_SPEED_DIAL_EXPORT);
             </button>
           </div>
         </div>
+        <!-- Horizontal Spacer Right -->
+        <div [style.flex-grow]="100 - settings().containerAlignH"></div>
       </div>
+
+      <!-- Vertical Spacer Bottom -->
+      <div [style.flex-grow]="100 - settings().containerAlignV"></div>
     </main>
 
       <!-- Sidebar Trigger -->
@@ -451,36 +454,41 @@ const INITIAL_SETTINGS = mapSpeedDialSettings(INITIAL_SPEED_DIAL_EXPORT);
                              class="w-full accent-blue-500 h-1.5 rounded-lg appearance-none bg-white/10 cursor-pointer" />
                     </div>
 
-                    <div class="space-y-3 pt-2 border-t border-white/5">
-                      <label class="text-xs font-bold uppercase tracking-widest opacity-40">Container Alignment</label>
-                      <div class="grid grid-cols-2 gap-4">
+                    <div class="space-y-4 pt-4 border-t border-white/5">
+                      <div class="flex items-center gap-2 mb-2">
+                        <i class="w-4 h-4 opacity-50" data-lucide="layout"></i>
+                        <label class="text-xs font-bold uppercase tracking-widest opacity-40">Container Alignment</label>
+                      </div>
+                      
+                      <div class="space-y-4">
+                        <!-- Horizontal Alignment Slider -->
                         <div class="space-y-2">
-                           <span class="text-[10px] font-medium opacity-40">Horizontal</span>
-                           <div class="flex gap-1 p-1 rounded-xl bg-black/10">
-                              @for (posH of ['left', 'center', 'right']; track posH) {
-                                <button (click)="updateSetting('containerAlignH', $any(posH))"
-                                   class="flex-1 py-1.5 rounded-lg text-[10px] font-bold transition-all capitalize"
-                                   [class.bg-white]="settings().containerAlignH === posH"
-                                   [class.text-black]="settings().containerAlignH === posH"
-                                   [class.opacity-40]="settings().containerAlignH !== posH">
-                                   {{posH}}
-                                </button>
-                              }
-                           </div>
+                          <div class="flex justify-between items-center">
+                            <span class="text-[10px] font-medium opacity-40 uppercase tracking-wider">Horizontal</span>
+                            <span class="text-[10px] font-mono bg-white/5 px-2 py-0.5 rounded-lg opacity-60">{{settings().containerAlignH}}%</span>
+                          </div>
+                          <div class="flex items-center gap-3">
+                            <i class="w-3.5 h-3.5 opacity-30" data-lucide="align-left"></i>
+                            <input type="range" min="0" max="100" [value]="settings().containerAlignH"
+                                   (input)="updateSetting('containerAlignH', +$any($event.target).value)" 
+                                   class="flex-1 accent-blue-500 h-1 rounded-lg appearance-none bg-white/5 cursor-pointer" />
+                            <i class="w-3.5 h-3.5 opacity-30" data-lucide="align-right"></i>
+                          </div>
                         </div>
+
+                        <!-- Vertical Alignment Slider -->
                         <div class="space-y-2">
-                           <span class="text-[10px] font-medium opacity-40">Vertical</span>
-                           <div class="flex gap-1 p-1 rounded-xl bg-black/10">
-                              @for (posV of ['top', 'center', 'bottom']; track posV) {
-                                <button (click)="updateSetting('containerAlignV', $any(posV))"
-                                   class="flex-1 py-1.5 rounded-lg text-[10px] font-bold transition-all capitalize"
-                                   [class.bg-white]="settings().containerAlignV === posV"
-                                   [class.text-black]="settings().containerAlignV === posV"
-                                   [class.opacity-40]="settings().containerAlignV !== posV">
-                                   {{posV}}
-                                </button>
-                              }
-                           </div>
+                          <div class="flex justify-between items-center">
+                            <span class="text-[10px] font-medium opacity-40 uppercase tracking-wider">Vertical</span>
+                            <span class="text-[10px] font-mono bg-white/5 px-2 py-0.5 rounded-lg opacity-60">{{settings().containerAlignV}}%</span>
+                          </div>
+                          <div class="flex items-center gap-3">
+                            <i class="w-3.5 h-3.5 opacity-30" data-lucide="arrow-up"></i>
+                            <input type="range" min="0" max="100" [value]="settings().containerAlignV"
+                                   (input)="updateSetting('containerAlignV', +$any($event.target).value)" 
+                                   class="flex-1 accent-blue-500 h-1 rounded-lg appearance-none bg-white/5 cursor-pointer" />
+                            <i class="w-3.5 h-3.5 opacity-30" data-lucide="arrow-down"></i>
+                          </div>
                         </div>
                       </div>
                     </div>
