@@ -18,6 +18,7 @@ interface AppBookmark {
   backgroundImage?: string;
   showIcon?: boolean;
   bgDepth?: number;
+  displayOrder?: number;
 }
 
 interface AppSettings {
@@ -1317,7 +1318,7 @@ export class App implements OnInit {
   }
 
   // --- Supabase Mapping Helpers ---
-  private mapBookmarkToDb(bookmark: AppBookmark): any {
+  private mapBookmarkToDb(bookmark: AppBookmark, displayOrder: number): any {
     return {
       bookmark_id: bookmark.id,
       title: bookmark.title,
@@ -1326,6 +1327,7 @@ export class App implements OnInit {
       background_image_url: bookmark.backgroundImage || null,
       show_icon: bookmark.showIcon !== false,
       bg_depth: bookmark.bgDepth ?? 80,
+      display_order: displayOrder,
     };
   }
 
@@ -1338,6 +1340,7 @@ export class App implements OnInit {
       backgroundImage: db.background_image_url || undefined,
       showIcon: db.show_icon,
       bgDepth: db.bg_depth,
+      displayOrder: db.display_order ?? undefined,
     };
   }
 
@@ -1358,7 +1361,7 @@ export class App implements OnInit {
     let toastType: 'success' | 'error' | null = null;
     try {
       const dbSettings = this.mapSettingsToDb(this.settings());
-      const dbBookmarks = this.bookmarks().map(bm => this.mapBookmarkToDb(bm));
+      const dbBookmarks = this.bookmarks().map((bm, index) => this.mapBookmarkToDb(bm, index));
 
       const { error: settingsError } = await this.supabaseService.upsertRow('user_settings', dbSettings);
       if (settingsError) throw settingsError;
@@ -1408,7 +1411,13 @@ export class App implements OnInit {
       if (bookmarksError) throw bookmarksError;
 
       if (bookmarksData && Array.isArray(bookmarksData)) {
-        this.bookmarks.set(bookmarksData.map(db => this.mapDbToBookmark(db)));
+        const orderedBookmarks = [...bookmarksData].sort((left, right) => {
+          const leftOrder = left.display_order ?? Number.MAX_SAFE_INTEGER;
+          const rightOrder = right.display_order ?? Number.MAX_SAFE_INTEGER;
+          return leftOrder - rightOrder;
+        });
+
+        this.bookmarks.set(orderedBookmarks.map(db => this.mapDbToBookmark(db)));
       }
 
       await new Promise(r => setTimeout(r, 1500));

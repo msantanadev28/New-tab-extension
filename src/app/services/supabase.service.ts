@@ -96,7 +96,10 @@ export class SupabaseService {
   // --- Bookmarks CRUD ---
 
   async getBookmarks() {
-    return await this.listRows('bookmarks');
+    return await this.tableQuery('bookmarks')
+      .select('*')
+      .order('display_order', { ascending: true, nullsFirst: false })
+      .order('created_at', { ascending: true, nullsFirst: false });
   }
 
   async getBookmarkById(id: string) {
