@@ -29,6 +29,9 @@ interface AppSettings {
   bgBlur: number;
   bgRefraction: number;
   bgDepth: number;
+  dialWidth: number;
+  dialHeight: number;
+  dialRoundness: number;
 }
 
 interface AppRecentlyClosedTab {
@@ -96,6 +99,9 @@ function mapSpeedDialSettings(data: SpeedDialExportModel): AppSettings {
     bgBlur: 10,
     bgRefraction: 40,
     bgDepth: 80,
+    dialWidth: 180,
+    dialHeight: 180,
+    dialRoundness: 32,
   };
 }
 
@@ -152,7 +158,7 @@ const INITIAL_SETTINGS = mapSpeedDialSettings(INITIAL_SPEED_DIAL_EXPORT);
             [class.justify-center]="settings().centerVertically" [class.pt-20]="!settings().centerVertically">
 
         <!-- Search Bar -->
-        @if (settings().showSearch) {
+<!--         @if (settings().showSearch) {
           <div class="w-full max-w-2xl mx-auto mb-16 relative">
             <div class="flex items-center gap-4 px-6 py-4 rounded-2xl focus-within:ring-2 ring-blue-500/50 transition-all"
                  [class]="glassEffect()">
@@ -166,7 +172,7 @@ const INITIAL_SETTINGS = mapSpeedDialSettings(INITIAL_SPEED_DIAL_EXPORT);
               />
             </div>
           </div>
-        }
+        } -->
 
         <!-- Bookmark Grid -->
         <div
@@ -176,13 +182,16 @@ const INITIAL_SETTINGS = mapSpeedDialSettings(INITIAL_SPEED_DIAL_EXPORT);
           [style.gap.px]="settings().gap"
         >
           @for (bookmark of bookmarks(); track bookmark.id) {
-            <div class="group relative">
+            <div class="group relative flex justify-center">
               <a
                 [href]="bookmark.url"
                 [target]="settings().openInNewTab ? '_blank' : '_self'"
                 (contextmenu)="onContextMenu($event, bookmark)"
-                class="flex flex-col items-center justify-center gap-4 p-6 rounded-[2rem] group-hover:scale-105 group-hover:-translate-y-1 transition-all duration-300 relative overflow-hidden"
+                class="flex flex-col items-center justify-center gap-4 p-6 group-hover:scale-105 group-hover:-translate-y-1 transition-all duration-300 relative overflow-hidden"
                 [class]="glassEffect() + ' ' + itemHover()"
+                [style.width.px]="settings().dialWidth"
+                [style.height.px]="settings().dialHeight"
+                [style.border-radius.px]="settings().dialRoundness"
               >
                 <!-- Bookmark Background Image -->
                 @if (bookmark.backgroundImage) {
@@ -210,20 +219,25 @@ const INITIAL_SETTINGS = mapSpeedDialSettings(INITIAL_SPEED_DIAL_EXPORT);
             </div>
           }
 
-          <button
-            (click)="openAddModal()"
-            class="flex flex-col items-center justify-center gap-4 p-6 rounded-[2rem] border-2 border-dashed transition-all hover:scale-105"
-            [class.border-white-10]="settings().theme === 'dark'"
-            [class.hover:border-white-30]="settings().theme === 'dark'"
-            [class.border-black-10]="settings().theme === 'light'"
-            [class.hover:border-black-20]="settings().theme === 'light'"
-            style="border-color: rgba(255,255,255,0.1)"
-          >
-            <div class="w-16 h-16 rounded-2xl flex items-center justify-center bg-white/5 text-current opacity-40">
-              <i class="w-8 h-8" data-lucide="plus"></i>
-            </div>
-            <span class="text-sm font-medium opacity-40">Add Site</span>
-          </button>
+          <div class="flex justify-center">
+            <button
+              (click)="openAddModal()"
+              class="flex flex-col items-center justify-center gap-4 p-6 border-2 border-dashed transition-all hover:scale-105"
+              [class.border-white-10]="settings().theme === 'dark'"
+              [class.hover:border-white-30]="settings().theme === 'dark'"
+              [class.border-black-10]="settings().theme === 'light'"
+              [class.hover:border-black-20]="settings().theme === 'light'"
+              [style.width.px]="settings().dialWidth"
+              [style.height.px]="settings().dialHeight"
+              [style.border-radius.px]="settings().dialRoundness"
+              style="border-color: rgba(255,255,255,0.1)"
+            >
+              <div class="w-16 h-16 rounded-2xl flex items-center justify-center bg-white/5 text-current opacity-40">
+                <i class="w-8 h-8" data-lucide="plus"></i>
+              </div>
+              <span class="text-sm font-medium opacity-40">Add Site</span>
+            </button>
+          </div>
         </div>
       </main>
 
@@ -309,6 +323,15 @@ const INITIAL_SETTINGS = mapSpeedDialSettings(INITIAL_SPEED_DIAL_EXPORT);
                     <div class="absolute bottom-[-1px] left-0 right-0 h-0.5 bg-blue-500 rounded-full shadow-[0_0_8px_rgba(59,130,246,0.5)]"></div>
                   }
                 </button>
+                <button (click)="settingsTab.set('dials')" 
+                  class="pb-3 text-sm font-semibold transition-all relative flex items-center gap-2"
+                  [class.opacity-40]="settingsTab() !== 'dials'">
+                  <i class="w-4 h-4" data-lucide="grid-3x3"></i>
+                  Dial Settings
+                  @if (settingsTab() === 'dials') {
+                    <div class="absolute bottom-[-1px] left-0 right-0 h-0.5 bg-blue-500 rounded-full shadow-[0_0_8px_rgba(59,130,246,0.5)]"></div>
+                  }
+                </button>
                 <button (click)="settingsTab.set('background')" 
                   class="pb-3 text-sm font-semibold transition-all relative flex items-center gap-2"
                   [class.opacity-40]="settingsTab() !== 'background'">
@@ -361,8 +384,65 @@ const INITIAL_SETTINGS = mapSpeedDialSettings(INITIAL_SPEED_DIAL_EXPORT);
                   </div>
                 }
 
+                @if (settingsTab() === 'dials') {
+                  <div class="space-y-6">
+                    <div class="space-y-3">
+                      <div class="flex justify-between items-center">
+                        <label class="text-sm font-medium opacity-60">Dial Width</label>
+                        <span class="text-xs font-mono bg-white/10 px-2.5 py-0.5 rounded-lg">{{settings().dialWidth}}px</span>
+                      </div>
+                      <input type="range" min="100" max="400" [value]="settings().dialWidth"
+                             (input)="updateSetting('dialWidth', +$any($event.target).value)" 
+                             class="w-full accent-blue-500 h-1.5 rounded-lg appearance-none bg-white/10 cursor-pointer" />
+                    </div>
+                    <div class="space-y-3">
+                      <div class="flex justify-between items-center">
+                        <label class="text-sm font-medium opacity-60">Dial Height</label>
+                        <span class="text-xs font-mono bg-white/10 px-2.5 py-0.5 rounded-lg">{{settings().dialHeight}}px</span>
+                      </div>
+                      <input type="range" min="80" max="400" [value]="settings().dialHeight"
+                             (input)="updateSetting('dialHeight', +$any($event.target).value)" 
+                             class="w-full accent-blue-500 h-1.5 rounded-lg appearance-none bg-white/10 cursor-pointer" />
+                    </div>
+                    <div class="space-y-3">
+                      <div class="flex justify-between items-center">
+                        <label class="text-sm font-medium opacity-60">Dial Roundness</label>
+                        <span class="text-xs font-mono bg-white/10 px-2.5 py-0.5 rounded-lg">{{settings().dialRoundness}}px</span>
+                      </div>
+                      <input type="range" min="0" max="100" [value]="settings().dialRoundness"
+                             (input)="updateSetting('dialRoundness', +$any($event.target).value)" 
+                             class="w-full accent-blue-500 h-1.5 rounded-lg appearance-none bg-white/10 cursor-pointer" />
+                    </div>
+                  </div>
+                }
+
                 @if (settingsTab() === 'background') {
                   <div class="space-y-4">
+                    <!-- Live Preview Card -->
+                    <div class="relative w-full h-32 rounded-3xl overflow-hidden mb-6 group border border-white/10 shadow-2xl bg-black/5">
+                      @if (settings().backgroundImage) {
+                        <div class="absolute inset-0 transition-all duration-300"
+                             [style.filter]="'brightness(' + settings().bgDepth + '%)'">
+                          <img [src]="settings().backgroundImage" class="absolute inset-0 w-full h-full object-cover" alt="" />
+                        </div>
+                        <div class="absolute inset-0 transition-all duration-300"
+                             [style.backdrop-filter]="'blur(' + settings().bgBlur + 'px)'"
+                             [style.background-color]="settings().theme === 'dark' 
+                               ? 'rgba(0,0,0,' + (settings().bgRefraction / 100) + ')' 
+                               : 'rgba(255,255,255,' + (settings().bgRefraction / 100) + ')'">
+                        </div>
+                      } @else {
+                        <div class="absolute inset-0 transition-colors" [class.bg-[#0a0a0a]]="settings().theme === 'dark'" [class.bg-gray-100]="settings().theme === 'light'"></div>
+                        <div class="absolute inset-0 flex flex-col items-center justify-center opacity-20 gap-2">
+                          <i class="w-8 h-8" data-lucide="image"></i>
+                          <span class="text-[10px] font-bold uppercase tracking-widest">No Image</span>
+                        </div>
+                      }
+                      <div class="absolute top-3 left-3">
+                        <span class="px-2.5 py-1 rounded-lg bg-black/40 backdrop-blur-md text-[10px] font-bold uppercase tracking-wider text-white/90 border border-white/10">Preview</span>
+                      </div>
+                    </div>
+
                     <div class="space-y-3">
                       <label class="text-sm font-medium opacity-60">Background Image</label>
                       <div class="space-y-3">
@@ -454,10 +534,13 @@ const INITIAL_SETTINGS = mapSpeedDialSettings(INITIAL_SPEED_DIAL_EXPORT);
                   <label class="text-sm font-medium opacity-60">Background Image (Optional)</label>
                   <div class="space-y-3">
                     @if (tempBookmarkBg()) {
-                      <div class="relative w-full h-32 rounded-2xl overflow-hidden group mb-2 border border-white/10 shadow-inner">
-                        <img [src]="tempBookmarkBg()" class="w-full h-full object-cover" />
+                      <div class="relative w-full h-32 rounded-2xl overflow-hidden group mb-2 border border-white/10 shadow-inner bg-black/5">
+                        <div class="absolute inset-0 transition-all duration-300" 
+                             [style.filter]="'brightness(' + tempBookmarkDepth() + '%)'">
+                          <img [src]="tempBookmarkBg()" class="w-full h-full object-cover" />
+                        </div>
                         <button type="button" (click)="tempBookmarkBg.set(null)" 
-                                class="absolute top-2 right-2 p-1.5 bg-red-500/80 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity backdrop-blur-md">
+                                class="absolute top-2 right-2 p-1.5 bg-red-500/80 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity backdrop-blur-md z-10">
                            <i class="w-4 h-4" data-lucide="trash-2"></i>
                         </button>
                       </div>
@@ -553,7 +636,7 @@ export class App implements OnInit {
   tempShowIcon = signal(true);
   isSidebarHovered = signal(false);
   contextMenu = signal<{x: number, y: number, bookmark: AppBookmark} | null>(null);
-  settingsTab = signal<'general' | 'background'>('general');
+  settingsTab = signal<'general' | 'background' | 'dials'>('general');
   tempBookmarkBg = signal<string | null>(null);
   tempBookmarkDepth = signal<number>(80);
 
