@@ -300,24 +300,8 @@ const INITIAL_SETTINGS = mapSpeedDialSettings(INITIAL_SPEED_DIAL_EXPORT);
         </div>
 
         <div class="flex-1 overflow-y-auto pr-2 custom-scrollbar">
-          <section class="mb-10">
-            <h4 class="text-[10px] font-bold uppercase tracking-wider opacity-40 mb-4 px-2">Bookmarks</h4>
-            <div class="space-y-1">
-              @for (b of filteredBrowserBookmarks(); track $index) {
-                <a [href]="b.url" class="flex items-center gap-3 p-3 rounded-2xl" [class]="itemHover()">
-                  @if (b.icon) {
-                    <img [src]="b.icon" class="w-5 h-5" alt="" />
-                  } @else {
-                    <i class="w-4 h-4 opacity-30" data-lucide="bookmark"></i>
-                  }
-                  <span class="text-sm truncate flex-1">{{ b.title }}</span>
-                </a>
-              }
-            </div>
-          </section>
-
           @if (recentlyClosed().length > 0) {
-            <section>
+            <section class="mb-10">
               <h4 class="text-[10px] font-bold uppercase tracking-wider opacity-40 mb-4 px-2 flex items-center gap-2">
                 <i class="w-3 h-3" data-lucide="history"></i> Recently Closed
               </h4>
@@ -335,6 +319,22 @@ const INITIAL_SETTINGS = mapSpeedDialSettings(INITIAL_SPEED_DIAL_EXPORT);
               </div>
             </section>
           }
+
+          <section class="mb-10">
+            <h4 class="text-[10px] font-bold uppercase tracking-wider opacity-40 mb-4 px-2">Bookmarks</h4>
+            <div class="space-y-1">
+              @for (b of filteredBrowserBookmarks(); track $index) {
+                <a [href]="b.url" class="flex items-center gap-3 p-3 rounded-2xl" [class]="itemHover()">
+                  @if (b.icon) {
+                    <img [src]="b.icon" class="w-5 h-5" alt="" />
+                  } @else {
+                    <i class="w-4 h-4 opacity-30" data-lucide="bookmark"></i>
+                  }
+                  <span class="text-sm truncate flex-1">{{ b.title }}</span>
+                </a>
+              }
+            </div>
+          </section>
         </div>
       </aside>
 
@@ -988,7 +988,7 @@ export class App implements OnInit {
     }
 
     if (chrome.sessions) {
-      chrome.sessions.getRecentlyClosed({ maxResults: 10 }, (sessions: ChromeRecentlyClosedSession[]) => {
+      chrome.sessions.getRecentlyClosed({ maxResults: 5 }, (sessions: ChromeRecentlyClosedSession[]) => {
         const closed = sessions
           .filter((session) => session.tab?.url)
           .map((session) => ({
