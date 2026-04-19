@@ -854,9 +854,15 @@ export class App implements OnInit {
         return;
       }
 
-      const state = { bookmarks: this.bookmarks(), settings: this.settings() };
-      if (typeof chrome !== 'undefined' && chrome.storage) {
-        chrome.storage.local.set(state);
+      const bookmarks = this.bookmarks();
+      const settings = this.settings();
+
+      if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
+        chrome.storage.local.set({ bookmarks, settings });
+      } else {
+        // Fallback for regular web preview
+        localStorage.setItem('app_bookmarks', JSON.stringify(bookmarks));
+        localStorage.setItem('app_settings', JSON.stringify(settings));
       }
     });
 
@@ -898,22 +904,39 @@ export class App implements OnInit {
   }
 
   private initData() {
-    if (typeof chrome === 'undefined' || !chrome.storage) {
+    const hasChromeStorage = typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local;
+
+    if (hasChromeStorage) {
+      chrome.storage.local.get(['bookmarks', 'settings'], (result: StoredAppState) => {
+        if (result.bookmarks) {
+          this.bookmarks.set(result.bookmarks);
+        }
+        if (result.settings) {
+          this.settings.set({ ...this.settings(), ...result.settings });
+        }
+        this.storageHydrated.set(true);
+      });
+    } else {
+      // Fallback for regular web preview
+      const savedBookmarks = localStorage.getItem('app_bookmarks');
+      const savedSettings = localStorage.getItem('app_settings');
+
+      if (savedBookmarks) {
+        try {
+          this.bookmarks.set(JSON.parse(savedBookmarks));
+        } catch (e) {
+          console.error('Failed to parse saved bookmarks', e);
+        }
+      }
+      if (savedSettings) {
+        try {
+          this.settings.set({ ...this.settings(), ...JSON.parse(savedSettings) });
+        } catch (e) {
+          console.error('Failed to parse saved settings', e);
+        }
+      }
       this.storageHydrated.set(true);
-      return;
     }
-
-    chrome.storage.local.get(['bookmarks', 'settings'], (result: StoredAppState) => {
-      if (result.bookmarks) {
-        this.bookmarks.set(result.bookmarks);
-      }
-
-      if (result.settings) {
-        this.settings.set({ ...this.settings(), ...result.settings });
-      }
-
-      this.storageHydrated.set(true);
-    });
 
     if (chrome.sessions) {
       chrome.sessions.getRecentlyClosed({ maxResults: 10 }, (sessions: ChromeRecentlyClosedSession[]) => {
