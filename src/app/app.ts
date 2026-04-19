@@ -26,6 +26,7 @@ interface AppSettings {
   gapY: number;
   showSearch: boolean;
   showIcons: boolean;
+  showTitles: boolean;
   backgroundImage?: string;
   bgBlur: number;
   bgRefraction: number;
@@ -99,6 +100,7 @@ function mapSpeedDialSettings(data: SpeedDialExportModel): AppSettings {
     gapY: preferences.spacing,
     showSearch: true,
     showIcons: true,
+    showTitles: true,
     backgroundImage: activeTheme.backgroundImage || undefined,
     bgBlur: 10,
     bgRefraction: 40,
@@ -224,9 +226,11 @@ const INITIAL_SETTINGS = mapSpeedDialSettings(INITIAL_SPEED_DIAL_EXPORT);
                   </div>
                 }
 
-                <span class="text-sm font-medium opacity-80 group-hover:opacity-100 transition-opacity truncate w-full text-center relative z-10">
-                  {{ bookmark.title }}
-                </span>
+                @if (settings().showTitles) {
+                  <span class="text-sm font-medium opacity-80 group-hover:opacity-100 transition-opacity truncate w-full text-center relative z-10">
+                    {{ bookmark.title }}
+                  </span>
+                }
               </a>
             </div>
           }
@@ -454,6 +458,19 @@ const INITIAL_SETTINGS = mapSpeedDialSettings(INITIAL_SPEED_DIAL_EXPORT);
                              class="w-full accent-blue-500 h-1.5 rounded-lg appearance-none bg-white/10 cursor-pointer" />
                     </div>
 
+                    <div class="flex items-center justify-between pt-4 border-t border-white/5">
+                      <div class="flex items-center gap-2">
+                        <i class="w-4 h-4 opacity-50" data-lucide="type"></i>
+                        <label class="text-sm font-medium opacity-80">Show Bookmark Titles</label>
+                      </div>
+                      <button (click)="updateSetting('showTitles', !settings().showTitles)"
+                        class="w-12 h-6 rounded-full transition-all relative"
+                        [style.background-color]="settings().showTitles ? '#3b82f6' : 'rgba(156, 163, 175, 0.3)'">
+                        <div class="absolute top-1 w-4 h-4 rounded-full bg-white transition-all"
+                             [style.left]="settings().showTitles ? '1.75rem' : '0.25rem'"></div>
+                      </button>
+                    </div>
+
                     <div class="space-y-4 pt-4 border-t border-white/5">
                       <div class="flex items-center gap-2 mb-2">
                         <i class="w-4 h-4 opacity-50" data-lucide="layout"></i>
@@ -609,6 +626,32 @@ const INITIAL_SETTINGS = mapSpeedDialSettings(INITIAL_SPEED_DIAL_EXPORT);
                   <input name="url" [value]="editingBookmark()?.url || ''" required type="url"
                          class="w-full p-4 rounded-2xl bg-black/10 border-none outline-none focus:ring-2 ring-blue-500/50" placeholder="https://..." />
                 </div>
+
+                <div class="space-y-3">
+                  <label class="text-sm font-medium opacity-60">Custom Icon (Optional)</label>
+                  <div class="flex items-center gap-4">
+                    <div class="w-16 h-16 rounded-2xl flex items-center justify-center p-3 bg-black/10 border border-white/5 relative overflow-hidden group/icon-preview">
+                      <img [src]="tempBookmarkIcon() || buildFaviconUrl(editingBookmark()?.url || '')" class="w-full h-full object-contain" />
+                      @if (tempBookmarkIcon()) {
+                        <button type="button" (click)="tempBookmarkIcon.set(null)" 
+                                class="absolute inset-0 bg-red-500/80 text-white flex items-center justify-center opacity-0 group-hover/icon-preview:opacity-100 transition-opacity">
+                           <i class="w-5 h-5" data-lucide="trash-2"></i>
+                        </button>
+                      }
+                    </div>
+                    <div class="flex-1 space-y-2">
+                      <input name="icon" [value]="tempBookmarkIcon() || ''"
+                             (input)="tempBookmarkIcon.set($any($event.target).value)"
+                             class="w-full p-3 rounded-xl bg-black/10 border-none outline-none focus:ring-2 ring-blue-500/50 text-xs" 
+                             placeholder="Icon URL..." />
+                      <button type="button" (click)="bookmarkIconFileInput.click()" 
+                              class="w-full py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/5 transition-all flex items-center justify-center gap-2 text-xs font-medium">
+                        <i class="w-3.5 h-3.5" data-lucide="upload"></i> Pick Icon File
+                      </button>
+                      <input type="file" #bookmarkIconFileInput accept="image/*" class="hidden" (change)="onBookmarkIconUpload($event)" />
+                    </div>
+                  </div>
+                </div>
                 <div class="space-y-3">
                   <label class="text-sm font-medium opacity-60">Background Image (Optional)</label>
                   <div class="space-y-3">
@@ -717,7 +760,9 @@ export class App implements OnInit {
   contextMenu = signal<{x: number, y: number, bookmark: AppBookmark} | null>(null);
   settingsTab = signal<'general' | 'background' | 'dials'>('general');
   tempBookmarkBg = signal<string | null>(null);
+  tempBookmarkIcon = signal<string | null>(null);
   tempBookmarkDepth = signal<number>(80);
+  buildFaviconUrl = buildFaviconUrl;
 
   // Helper for settings UI
   toggleItems: { label: string, key: ToggleSettingKey }[] = [
@@ -870,6 +915,7 @@ export class App implements OnInit {
     this.editingBookmark.set(null);
     this.tempShowIcon.set(true);
     this.tempBookmarkBg.set(null);
+    this.tempBookmarkIcon.set(null);
     this.tempBookmarkDepth.set(80);
     this.isAddModalOpen.set(true);
   }
@@ -878,6 +924,7 @@ export class App implements OnInit {
     this.editingBookmark.set(bookmark);
     this.tempShowIcon.set(bookmark.showIcon !== false);
     this.tempBookmarkBg.set(bookmark.backgroundImage || null);
+    this.tempBookmarkIcon.set(bookmark.icon || null);
     this.tempBookmarkDepth.set(bookmark.bgDepth ?? 80);
     this.isAddModalOpen.set(true);
   }
@@ -887,6 +934,7 @@ export class App implements OnInit {
     this.isAddModalOpen.set(false);
     this.editingBookmark.set(null);
     this.tempBookmarkBg.set(null);
+    this.tempBookmarkIcon.set(null);
     this.tempBookmarkDepth.set(80);
     this.settingsTab.set('general');
   }
@@ -929,6 +977,18 @@ export class App implements OnInit {
     }
   }
 
+  onBookmarkIconUpload(event: Event) {
+    const file = (event.target as HTMLInputElement).files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const result = e.target?.result as string;
+        this.tempBookmarkIcon.set(result);
+      };
+      reader.readAsDataURL(file);
+    }
+  }
+
   handleBookmarkSubmit(e: Event) {
     e.preventDefault();
     const form = e.target as HTMLFormElement;
@@ -936,18 +996,19 @@ export class App implements OnInit {
     const title = formData.get('title') as string;
     const url = formData.get('url') as string;
     const backgroundImage = formData.get('backgroundImage') as string;
+    const customIcon = formData.get('icon') as string;
     const showIcon = formData.get('showIcon') === 'true';
 
-    const icon = buildFaviconUrl(url);
-
-    const editItem = this.editingBookmark();
+    const finalIcon = this.tempBookmarkIcon() || customIcon || buildFaviconUrl(url);
     const finalBg = this.tempBookmarkBg() || backgroundImage;
     const finalDepth = this.tempBookmarkDepth();
 
+    const editItem = this.editingBookmark();
+
     if (editItem) {
-      this.bookmarks.update(prev => prev.map(b => b.id === editItem.id ? { ...b, title, url, icon, backgroundImage: finalBg, showIcon, bgDepth: finalDepth } : b));
+      this.bookmarks.update(prev => prev.map(b => b.id === editItem.id ? { ...b, title, url, icon: finalIcon, backgroundImage: finalBg, showIcon, bgDepth: finalDepth } : b));
     } else {
-      this.bookmarks.update(prev => [...prev, { id: Date.now().toString(), title, url, icon, backgroundImage: finalBg, showIcon, bgDepth: finalDepth }]);
+      this.bookmarks.update(prev => [...prev, { id: Date.now().toString(), title, url, icon: finalIcon, backgroundImage: finalBg, showIcon, bgDepth: finalDepth }]);
     }
     this.closeModals();
   }
