@@ -2,6 +2,7 @@ import { Component, signal, computed, effect, inject, PLATFORM_ID, OnInit } from
 import { CommonModule, isPlatformBrowser } from '@angular/common';
 import { createIcons, icons } from 'lucide';
 import speedDialExportJson from '../../template/speed-dial-2-export-2026-04-18.json';
+import { environment } from '../environments/environment';
 import { SpeedDialExport, SpeedDialExportModel, type SpeedDialThemeMode } from './speed-dial.model';
 
 declare var chrome: any;
@@ -59,9 +60,43 @@ interface ChromeRecentlyClosedSession {
   tab?: ChromeTabSession;
 }
 
+interface SupabaseApiError {
+  code?: string;
+  details?: string | null;
+  hint?: string | null;
+  message?: string;
+}
+
 type ToggleSettingKey = 'centerVertically' | 'compactLayout' | 'openInNewTab' | 'showIcons';
 
 const INITIAL_SPEED_DIAL_EXPORT = SpeedDialExportModel.fromJson(speedDialExportJson as SpeedDialExport);
+
+function getSupabaseConfig() {
+  return {
+    supabaseUrl: environment.supabaseUrl.trim(),
+    supabaseAnonKey: environment.supabaseAnonKey.trim(),
+  };
+}
+
+async function readSupabaseError(response: Response): Promise<SupabaseApiError> {
+  const fallbackMessage = `Request failed with status ${response.status}`;
+
+  try {
+    const payload = (await response.json()) as SupabaseApiError;
+    return payload?.message ? payload : { message: fallbackMessage };
+  } catch {
+    const payload = await response.text();
+    return { message: payload || fallbackMessage };
+  }
+}
+
+function getSupabaseErrorMessage(error: SupabaseApiError): string {
+  if (error.code === 'PGRST205') {
+    return 'Supabase table public.backups is missing. Run supabase/setup-backups.sql in the Supabase SQL Editor, then try sync again.';
+  }
+
+  return error.message || 'Unknown Supabase error.';
+}
 
 function buildFaviconUrl(url: string): string {
   try {
@@ -664,6 +699,36 @@ const INITIAL_SETTINGS = mapSpeedDialSettings(INITIAL_SPEED_DIAL_EXPORT);
                       <i class="w-6 h-6 text-white/20 group-hover:text-purple-500 transition-colors" data-lucide="chevron-right"></i>
                       <input type="file" #importFileInput accept=".json" class="hidden" (change)="importSettings($event)" />
                     </div>
+
+                    <div class="space-y-4 pt-6 mt-6 border-t border-white/5">
+                      <h3 class="text-sm font-semibold text-white/50 uppercase tracking-widest">Supabase Cloud Sync</h3>
+                      
+                      <div class="p-8 rounded-[32px] bg-green-500/5 border border-green-500/10 flex items-center justify-between group hover:bg-green-500/10 transition-all cursor-pointer" (click)="syncToSupabase()">
+                        <div class="flex items-center space-x-6">
+                          <div class="p-4 bg-green-500/20 text-green-500 rounded-2xl group-hover:scale-110 transition-transform">
+                            <i class="w-6 h-6" data-lucide="cloud"></i>
+                          </div>
+                          <div>
+                            <h4 class="font-bold text-white text-lg">Sync to Supabase</h4>
+                            <p class="text-sm text-white/40">Upload your bookmarks and settings to Supabase</p>
+                          </div>
+                        </div>
+                        <i class="w-6 h-6 text-white/20 group-hover:text-green-500 transition-colors" data-lucide="chevron-right"></i>
+                      </div>
+                      
+                      <div class="p-8 rounded-[32px] bg-yellow-500/5 border border-yellow-500/10 flex items-center justify-between group hover:bg-yellow-500/10 transition-all cursor-pointer" (click)="restoreFromSupabase()">
+                        <div class="flex items-center space-x-6">
+                          <div class="p-4 bg-yellow-500/20 text-yellow-500 rounded-2xl group-hover:scale-110 transition-transform">
+                            <i class="w-6 h-6" data-lucide="cloud-download"></i>
+                          </div>
+                          <div>
+                            <h4 class="font-bold text-white text-lg">Restore from Supabase</h4>
+                            <p class="text-sm text-white/40">Download your bookmarks and settings from Supabase</p>
+                          </div>
+                        </div>
+                        <i class="w-6 h-6 text-white/20 group-hover:text-yellow-500 transition-colors" data-lucide="chevron-right"></i>
+                      </div>
+                    </div>
                   </div>
                 }
               </div>
@@ -1225,6 +1290,78 @@ export class App implements OnInit {
     reader.readAsText(file);
     // Reset the input value so the same file can be selected again
     (event.target as HTMLInputElement).value = '';
+  }
+
+  async syncToSupabase() {
+    const { supabaseUrl, supabaseAnonKey } = getSupabaseConfig();
+
+    if (!supabaseUrl || !supabaseAnonKey) {
+      alert('Supabase credentials not configured in environment.');
+      return;
+    }
+
+    const data: StoredAppState = {
+      bookmarks: this.bookmarks(),
+      settings: this.settings()
+    };
+
+    try {
+      const response = await fetch(`${supabaseUrl}/rest/v1/backups`, {
+        method: 'POST',
+        headers: {
+          'apikey': supabaseAnonKey,
+          'Authorization': `Bearer ${supabaseAnonKey}`,
+          'Content-Type': 'application/json',
+          'Prefer': 'resolution=merge-duplicates'
+        },
+        body: JSON.stringify({ id: 'default', state: data })
+      });
+
+      if (!response.ok) {
+        throw new Error(getSupabaseErrorMessage(await readSupabaseError(response)));
+      }
+      alert('Successfully synced to Supabase!');
+    } catch (err: any) {
+      console.error(err);
+      alert('Failed to sync to Supabase: ' + err.message);
+    }
+  }
+
+  async restoreFromSupabase() {
+    const { supabaseUrl, supabaseAnonKey } = getSupabaseConfig();
+
+    if (!supabaseUrl || !supabaseAnonKey) {
+      alert('Supabase credentials not configured in environment.');
+      return;
+    }
+
+    try {
+      const response = await fetch(`${supabaseUrl}/rest/v1/backups?id=eq.default`, {
+        method: 'GET',
+        headers: {
+          'apikey': supabaseAnonKey,
+          'Authorization': `Bearer ${supabaseAnonKey}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(getSupabaseErrorMessage(await readSupabaseError(response)));
+      }
+      
+      const rows = await response.json();
+      if (rows && rows.length > 0 && rows[0].state) {
+        const data = rows[0].state as StoredAppState;
+        if (data.bookmarks) this.bookmarks.set(data.bookmarks);
+        if (data.settings) this.settings.set({ ...this.settings(), ...data.settings });
+        alert('Successfully restored from Supabase!');
+      } else {
+        alert('No backup found in Supabase.');
+      }
+    } catch (err: any) {
+      console.error(err);
+      alert('Failed to restore from Supabase: ' + err.message);
+    }
   }
 }
 

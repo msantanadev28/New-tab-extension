@@ -57,3 +57,18 @@ Angular CLI does not come with an end-to-end testing framework by default. You c
 ## Additional Resources
 
 For more information on using the Angular CLI, including detailed command references, visit the [Angular CLI Overview and Command Reference](https://angular.dev/tools/cli) page.
+
+## Supabase Cloud Sync Setup
+
+The backup UI in the dashboard expects a `public.backups` table in Supabase.
+
+To create it:
+
+1. Open the Supabase project linked by your `.env` file.
+2. Go to SQL Editor.
+3. Run the SQL in `supabase/setup-backups.sql`.
+
+Notes:
+
+- The current app uses the publishable key only. The included SQL allows the `anon` role to read and write backups so the extension works without user authentication.
+- That means anyone with your project's publishable key can access the shared backup row. If you want private per-user backups, add Supabase Auth and replace the anonymous policies with authenticated user-scoped RLS policies.
