@@ -139,6 +139,18 @@
         "default": "8"
       },
       {
+        "column": "show_icons",
+        "type": "boolean",
+        "nullable": "YES",
+        "default": "true"
+      },
+      {
+        "column": "show_titles",
+        "type": "boolean",
+        "nullable": "YES",
+        "default": "true"
+      },
+      {
         "column": "updated_at",
         "type": "timestamp with time zone",
         "nullable": "YES",

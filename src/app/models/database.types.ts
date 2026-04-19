@@ -28,6 +28,8 @@ export interface UserSettings {
   theme_mode: string | null;
   custom_background_url: string | null;
   columns: number | null;
+  show_icons: boolean | null;
+  show_titles: boolean | null;
   updated_at: string | null;
 }
 

@@ -7,6 +7,7 @@ import speedDialExportJson from '../../template/speed-dial-2-export-2026-04-18.j
 import { environment } from '../environments/environment';
 import { SpeedDialExport, SpeedDialExportModel, type SpeedDialThemeMode } from './speed-dial.model';
 import { SupabaseService } from './services/supabase.service';
+import { SupabaseS3StorageService } from './services/supabase.s3storage.service';
 
 declare var chrome: any;
 
@@ -72,6 +73,8 @@ interface SupabaseApiError {
 }
 
 type ToggleSettingKey = 'centerVertically' | 'compactLayout' | 'openInNewTab' | 'showIcons';
+
+const BOOKMARK_IMAGE_BUCKET = 'new-tab-bucket';
 
 const INITIAL_SPEED_DIAL_EXPORT = SpeedDialExportModel.fromJson(speedDialExportJson as SpeedDialExport);
 
@@ -873,13 +876,13 @@ const INITIAL_SETTINGS = mapSpeedDialSettings(INITIAL_SPEED_DIAL_EXPORT);
         </div>
       }
 
-      <!-- Cloud Sync Overlay -->
-      @if (isSyncing()) {
+      <!-- Cloud Sync / Upload Overlay -->
+      @if (isSyncing() || isUploadingAsset()) {
         <div class="fixed inset-0 z-[200] flex flex-col items-center justify-center p-4 bg-black/80 backdrop-blur-xl animate-in fade-in duration-300">
           <div class="w-64 h-64 flex items-center justify-center relative mb-4">
                <ng-lottie [options]="lottieOptions"></ng-lottie>
           </div>
-          <h2 class="text-2xl font-bold text-white tracking-widest uppercase mb-2">{{ syncMessage() }}</h2>
+          <h2 class="text-2xl font-bold text-white tracking-widest uppercase mb-2">{{ isUploadingAsset() ? uploadMessage() : syncMessage() }}</h2>
           <p class="text-white/50 text-sm">Please wait while your data is securely synchronized...</p>
         </div>
       }
@@ -953,10 +956,13 @@ export class App implements OnInit {
   tempBookmarkBg = signal<string | null>(null);
   tempBookmarkIcon = signal<string | null>(null);
   tempBookmarkDepth = signal<number>(80);
+  tempBookmarkBlobs = signal<string[]>([]);
   buildFaviconUrl = buildFaviconUrl;
 
   isSyncing = signal(false);
   syncMessage = signal('Syncing to Cloud...');
+  isUploadingAsset = signal(false);
+  uploadMessage = signal('Uploading image to Supabase...');
 
   lottieOptions: AnimationOptions = {
     path: 'sync-animation.json',
@@ -999,6 +1005,7 @@ export class App implements OnInit {
   });
 
   private supabaseService = inject(SupabaseService);
+  private supabaseStorageService = inject(SupabaseS3StorageService);
 
   gridColumns = computed(() => {
     const count = this.settings().compactLayout
@@ -1157,6 +1164,7 @@ export class App implements OnInit {
     this.tempBookmarkBg.set(null);
     this.tempBookmarkIcon.set(null);
     this.tempBookmarkDepth.set(80);
+    this.tempBookmarkBlobs.set([]);
     this.isAddModalOpen.set(true);
   }
 
@@ -1166,6 +1174,7 @@ export class App implements OnInit {
     this.tempBookmarkBg.set(bookmark.backgroundImage || null);
     this.tempBookmarkIcon.set(bookmark.icon || null);
     this.tempBookmarkDepth.set(bookmark.bgDepth ?? 80);
+    this.tempBookmarkBlobs.set([]);
     this.isAddModalOpen.set(true);
   }
 
@@ -1176,6 +1185,8 @@ export class App implements OnInit {
     this.tempBookmarkBg.set(null);
     this.tempBookmarkIcon.set(null);
     this.tempBookmarkDepth.set(80);
+    void this.cleanupTemporaryBookmarkBlobs();
+    this.tempBookmarkBlobs.set([]);
     this.settingsTab.set('general');
   }
 
@@ -1206,18 +1217,10 @@ export class App implements OnInit {
   }
 
   onBookmarkBgUpload(event: Event) {
-    const file = (event.target as HTMLInputElement).files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const result = e.target?.result as string;
-        this.tempBookmarkBg.set(result);
-      };
-      reader.readAsDataURL(file);
-    }
+    void this.handleBookmarkImageSelection(event, (result) => this.tempBookmarkBg.set(result));
   }
 
-  handleImagePaste(event: ClipboardEvent, callback: (result: string) => void) {
+  async handleImagePaste(event: ClipboardEvent, callback: (result: string) => void) {
     const items = event.clipboardData?.items;
     if (!items) return;
 
@@ -1225,33 +1228,28 @@ export class App implements OnInit {
       if (items[i].type.indexOf('image') !== -1) {
         const file = items[i].getAsFile();
         if (file) {
-          const reader = new FileReader();
-          reader.onload = (e) => {
-            const result = e.target?.result as string;
-            callback(result);
-          };
-          reader.readAsDataURL(file);
           // Prevent the default paste if it's an image
           event.preventDefault();
+          try {
+            const uploadedUrl = await this.uploadBookmarkImage(file);
+            if (uploadedUrl) {
+              callback(uploadedUrl);
+            }
+          } catch (err) {
+            console.error(err);
+            toast.error(this.getImageUploadErrorMessage(err));
+          }
         }
         break;
       }
     }
   }
 
-  onBookmarkIconUpload(event: Event) {
-    const file = (event.target as HTMLInputElement).files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const result = e.target?.result as string;
-        this.tempBookmarkIcon.set(result);
-      };
-      reader.readAsDataURL(file);
-    }
+  async onBookmarkIconUpload(event: Event) {
+    await this.handleBookmarkImageSelection(event, (result) => this.tempBookmarkIcon.set(result));
   }
 
-  handleBookmarkSubmit(e: Event) {
+  async handleBookmarkSubmit(e: Event) {
     e.preventDefault();
     const form = e.target as HTMLFormElement;
     const formData = new FormData(form);
@@ -1261,18 +1259,172 @@ export class App implements OnInit {
     const customIcon = formData.get('icon') as string;
     const showIcon = formData.get('showIcon') === 'true';
 
-    const finalIcon = this.tempBookmarkIcon() || customIcon || buildFaviconUrl(url);
-    const finalBg = this.tempBookmarkBg() || backgroundImage;
     const finalDepth = this.tempBookmarkDepth();
 
-    const editItem = this.editingBookmark();
+    try {
+      const finalIcon = await this.uploadBookmarkImage(this.tempBookmarkIcon() || customIcon) || buildFaviconUrl(url);
+      const finalBg = await this.uploadBookmarkImage(this.tempBookmarkBg() || backgroundImage);
+      await this.cleanupTemporaryBookmarkBlobs([finalIcon, finalBg].filter((value): value is string => Boolean(value)));
+      const editItem = this.editingBookmark();
 
-    if (editItem) {
-      this.bookmarks.update(prev => prev.map(b => b.id === editItem.id ? { ...b, title, url, icon: finalIcon, backgroundImage: finalBg, showIcon, bgDepth: finalDepth } : b));
-    } else {
-      this.bookmarks.update(prev => [...prev, { id: Date.now().toString(), title, url, icon: finalIcon, backgroundImage: finalBg, showIcon, bgDepth: finalDepth }]);
+      if (editItem) {
+        this.bookmarks.update(prev => prev.map(b => b.id === editItem.id ? { ...b, title, url, icon: finalIcon, backgroundImage: finalBg ?? undefined, showIcon, bgDepth: finalDepth } : b));
+      } else {
+        this.bookmarks.update(prev => [...prev, { id: Date.now().toString(), title, url, icon: finalIcon, backgroundImage: finalBg ?? undefined, showIcon, bgDepth: finalDepth }]);
+      }
+      this.closeModals();
+    } catch (err) {
+      console.error(err);
+      toast.error(this.getImageUploadErrorMessage(err));
     }
-    this.closeModals();
+  }
+
+  private isClipboardImageEvent(input: string | File | ClipboardEvent): input is ClipboardEvent {
+    return typeof ClipboardEvent !== 'undefined' && input instanceof ClipboardEvent;
+  }
+
+  private isUploadedStorageUrl(value: string, bucket = BOOKMARK_IMAGE_BUCKET): boolean {
+    const publicUrlPrefix = `${environment.supabaseUrl.trim()}/storage/v1/object/public/${bucket}/`;
+    return value.startsWith(publicUrlPrefix);
+  }
+
+  private getImageUploadErrorMessage(error: unknown): string {
+    if (error instanceof Error) {
+      return error.message;
+    }
+
+    return 'Failed to upload image.';
+  }
+
+  private trackTemporaryBookmarkBlob(url: string) {
+    if (!this.editingBookmark()) {
+      return;
+    }
+
+    this.tempBookmarkBlobs.update((currentBlobs) => [...currentBlobs, url]);
+  }
+
+  private getStoragePathFromPublicUrl(url: string, bucket = BOOKMARK_IMAGE_BUCKET): string | null {
+    try {
+      const parsedUrl = new URL(url);
+      const marker = `/storage/v1/object/public/${bucket}/`;
+      const markerIndex = parsedUrl.pathname.indexOf(marker);
+
+      if (markerIndex === -1) {
+        return null;
+      }
+
+      return decodeURIComponent(parsedUrl.pathname.slice(markerIndex + marker.length));
+    } catch {
+      return null;
+    }
+  }
+
+  private async deleteTemporaryBookmarkBlob(url: string, bucket = BOOKMARK_IMAGE_BUCKET) {
+    const storagePath = this.getStoragePathFromPublicUrl(url, bucket);
+    if (!storagePath) {
+      return;
+    }
+
+    try {
+      await this.supabaseStorageService.deleteFile(bucket, storagePath);
+    } catch (err) {
+      console.error('Failed to delete temporary bookmark upload', err);
+    }
+  }
+
+  private async cleanupTemporaryBookmarkBlobs(keepUrls: string[] = []) {
+    const keepSet = new Set(keepUrls.filter(Boolean));
+    const temporaryBlobs = [...this.tempBookmarkBlobs()];
+    this.tempBookmarkBlobs.set([]);
+
+    await Promise.all(
+      temporaryBlobs
+        .filter((url) => !keepSet.has(url))
+        .map((url) => this.deleteTemporaryBookmarkBlob(url))
+    );
+  }
+
+  private async withUploadLoading<T>(message: string, operation: () => Promise<T>): Promise<T> {
+    this.uploadMessage.set(message);
+    this.isUploadingAsset.set(true);
+
+    try {
+      return await operation();
+    } finally {
+      this.isUploadingAsset.set(false);
+    }
+  }
+
+  private async uploadBookmarkImage(input: string | File | ClipboardEvent, bucket = BOOKMARK_IMAGE_BUCKET): Promise<string | null> {
+    if (typeof input === 'string') {
+      const value = input.trim();
+
+      if (!value) {
+        return null;
+      }
+
+      if (this.isUploadedStorageUrl(value, bucket)) {
+        return value;
+      }
+
+      if (value.startsWith('http')) {
+        return await this.withUploadLoading('Uploading image URL to Supabase...', () =>
+          this.supabaseStorageService.uploadFromUrl(value, bucket)
+        );
+      }
+
+      return value;
+    }
+
+    if (input instanceof File) {
+      const uploadedUrl = await this.withUploadLoading('Uploading local image to Supabase...', () =>
+        this.supabaseStorageService.uploadFromFile(input, bucket)
+      );
+
+      this.trackTemporaryBookmarkBlob(uploadedUrl);
+      return uploadedUrl;
+    }
+
+    if (this.isClipboardImageEvent(input)) {
+      const items = input.clipboardData?.items;
+      if (!items) {
+        return null;
+      }
+
+      for (let index = 0; index < items.length; index++) {
+        if (items[index].type.startsWith('image')) {
+          const file = items[index].getAsFile();
+          if (file) {
+            const uploadedUrl = await this.withUploadLoading('Uploading clipboard image to Supabase...', () =>
+              this.supabaseStorageService.uploadFromFile(file, bucket)
+            );
+
+            this.trackTemporaryBookmarkBlob(uploadedUrl);
+            return uploadedUrl;
+          }
+        }
+      }
+    }
+
+    return null;
+  }
+
+  private async handleBookmarkImageSelection(event: Event, callback: (result: string) => void) {
+    const file = (event.target as HTMLInputElement).files?.[0];
+    if (!file) {
+      return;
+    }
+
+    try {
+      const uploadedUrl = await this.uploadBookmarkImage(file);
+      if (uploadedUrl) {
+        callback(uploadedUrl);
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error(this.getImageUploadErrorMessage(err));
+    }
   }
 
   exportSettings() {
@@ -1351,6 +1503,8 @@ export class App implements OnInit {
       bg_depth: settings.bgDepth,
       custom_background_url: settings.backgroundImage || null,
       columns: settings.columns,
+      show_icons: settings.showIcons,
+      show_titles: settings.showTitles,
     };
   }
 
@@ -1403,6 +1557,8 @@ export class App implements OnInit {
           bgDepth: settingsData.bg_depth || this.settings().bgDepth,
           backgroundImage: settingsData.custom_background_url || this.settings().backgroundImage,
           columns: settingsData.columns ?? this.settings().columns,
+          showIcons: settingsData.show_icons ?? this.settings().showIcons,
+          showTitles: settingsData.show_titles ?? this.settings().showTitles,
         });
       }
 
