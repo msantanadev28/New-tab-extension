@@ -886,7 +886,7 @@ export class App implements OnInit {
       });
     }
 
-    if (chrome.bookmarks) {
+    if (typeof chrome !== 'undefined' && chrome.bookmarks) {
       chrome.bookmarks.getRecent(40, (bookmarks: any[]) => {
         const mapped = bookmarks.map(b => ({
           title: b.title,
