@@ -22,7 +22,8 @@ interface AppSettings {
   compactLayout: boolean;
   openInNewTab: boolean;
   columns: number;
-  gap: number;
+  gapX: number;
+  gapY: number;
   showSearch: boolean;
   showIcons: boolean;
   backgroundImage?: string;
@@ -32,6 +33,8 @@ interface AppSettings {
   dialWidth: number;
   dialHeight: number;
   dialRoundness: number;
+  containerAlignH: 'left' | 'center' | 'right';
+  containerAlignV: 'top' | 'center' | 'bottom';
 }
 
 interface AppRecentlyClosedTab {
@@ -92,7 +95,8 @@ function mapSpeedDialSettings(data: SpeedDialExportModel): AppSettings {
     compactLayout: false,
     openInNewTab: preferences.openInNewTab,
     columns: preferences.columns,
-    gap: preferences.spacing,
+    gapX: preferences.spacing,
+    gapY: preferences.spacing,
     showSearch: true,
     showIcons: true,
     backgroundImage: activeTheme.backgroundImage || undefined,
@@ -102,6 +106,8 @@ function mapSpeedDialSettings(data: SpeedDialExportModel): AppSettings {
     dialWidth: 180,
     dialHeight: 180,
     dialRoundness: 32,
+    containerAlignH: 'center',
+    containerAlignV: 'center',
   };
 }
 
@@ -154,8 +160,11 @@ const INITIAL_SETTINGS = mapSpeedDialSettings(INITIAL_SPEED_DIAL_EXPORT);
       </header>
 
       <!-- Main Grid Content -->
-      <main class="flex-1 flex flex-col px-6 pb-12 transition-all duration-500 relative z-10"
-            [class.justify-center]="settings().centerVertically" [class.pt-20]="!settings().centerVertically">
+      <main class="flex-1 flex flex-col px-6 pb-12 transition-all duration-500 relative z-10 overflow-y-auto"
+            [class.justify-center]="settings().containerAlignV === 'center'"
+            [class.justify-start]="settings().containerAlignV === 'top'"
+            [class.justify-end]="settings().containerAlignV === 'bottom'"
+            [style.padding-top.px]="settings().containerAlignV === 'top' ? 120 : (settings().containerAlignV === 'center' ? 0 : 0)">
 
         <!-- Search Bar -->
 <!--         @if (settings().showSearch) {
@@ -175,12 +184,17 @@ const INITIAL_SETTINGS = mapSpeedDialSettings(INITIAL_SPEED_DIAL_EXPORT);
         } -->
 
         <!-- Bookmark Grid -->
-        <div
-          class="mx-auto w-full max-w-6xl animate-in slide-in-from-bottom-8 duration-700"
-          [style.display]="'grid'"
-          [style.grid-template-columns]="gridColumns()"
-          [style.gap.px]="settings().gap"
-        >
+        <div class="w-full flex"
+             [class.justify-center]="settings().containerAlignH === 'center'"
+             [class.justify-start]="settings().containerAlignH === 'left'"
+             [class.justify-end]="settings().containerAlignH === 'right'">
+          <div
+            class="animate-in slide-in-from-bottom-8 duration-700 w-fit"
+            [style.display]="'grid'"
+            [style.grid-template-columns]="gridColumns()"
+            [style.column-gap.px]="settings().gapX"
+            [style.row-gap.px]="settings().gapY"
+          >
           @for (bookmark of bookmarks(); track bookmark.id) {
             <div class="group relative flex justify-center">
               <a
@@ -239,7 +253,8 @@ const INITIAL_SETTINGS = mapSpeedDialSettings(INITIAL_SPEED_DIAL_EXPORT);
             </button>
           </div>
         </div>
-      </main>
+      </div>
+    </main>
 
       <!-- Sidebar Trigger -->
       <div class="fixed top-0 right-0 w-4 h-screen z-40" (mouseenter)="isSidebarHovered.set(true)"></div>
@@ -364,15 +379,17 @@ const INITIAL_SETTINGS = mapSpeedDialSettings(INITIAL_SPEED_DIAL_EXPORT);
 
                     <div class="space-y-4">
                       @for (item of toggleItems; track item.key) {
-                        <div class="flex items-center justify-between">
-                          <label class="text-sm font-medium opacity-80">{{ item.label }}</label>
-                          <button (click)="updateSetting(item.key, !settings()[item.key])"
-                            class="w-12 h-6 rounded-full transition-all relative"
-                            [style.background-color]="settings()[item.key] ? '#3b82f6' : 'rgba(156, 163, 175, 0.3)'">
-                            <div class="absolute top-1 w-4 h-4 rounded-full bg-white transition-all"
-                                 [style.left]="settings()[item.key] ? '1.75rem' : '0.25rem'"></div>
-                          </button>
-                        </div>
+                        @if (item.key !== 'centerVertically') {
+                          <div class="flex items-center justify-between">
+                            <label class="text-sm font-medium opacity-80">{{ item.label }}</label>
+                            <button (click)="updateSetting(item.key, !settings()[item.key])"
+                              class="w-12 h-6 rounded-full transition-all relative"
+                              [style.background-color]="settings()[item.key] ? '#3b82f6' : 'rgba(156, 163, 175, 0.3)'">
+                              <div class="absolute top-1 w-4 h-4 rounded-full bg-white transition-all"
+                                   [style.left]="settings()[item.key] ? '1.75rem' : '0.25rem'"></div>
+                            </button>
+                          </div>
+                        }
                       }
                     </div>
 
@@ -412,6 +429,60 @@ const INITIAL_SETTINGS = mapSpeedDialSettings(INITIAL_SPEED_DIAL_EXPORT);
                       <input type="range" min="0" max="100" [value]="settings().dialRoundness"
                              (input)="updateSetting('dialRoundness', +$any($event.target).value)" 
                              class="w-full accent-blue-500 h-1.5 rounded-lg appearance-none bg-white/10 cursor-pointer" />
+                    </div>
+
+                    <div class="space-y-3">
+                      <div class="flex justify-between items-center">
+                        <label class="text-sm font-medium opacity-60">X Spacing (Horizontal)</label>
+                        <span class="text-xs font-mono bg-white/10 px-2.5 py-0.5 rounded-lg">{{settings().gapX}}px</span>
+                      </div>
+                      <input type="range" min="0" max="100" [value]="settings().gapX"
+                             (input)="updateSetting('gapX', +$any($event.target).value)" 
+                             class="w-full accent-blue-500 h-1.5 rounded-lg appearance-none bg-white/10 cursor-pointer" />
+                    </div>
+
+                    <div class="space-y-3">
+                      <div class="flex justify-between items-center">
+                        <label class="text-sm font-medium opacity-60">Y Spacing (Vertical)</label>
+                        <span class="text-xs font-mono bg-white/10 px-2.5 py-0.5 rounded-lg">{{settings().gapY}}px</span>
+                      </div>
+                      <input type="range" min="0" max="100" [value]="settings().gapY"
+                             (input)="updateSetting('gapY', +$any($event.target).value)" 
+                             class="w-full accent-blue-500 h-1.5 rounded-lg appearance-none bg-white/10 cursor-pointer" />
+                    </div>
+
+                    <div class="space-y-3 pt-2 border-t border-white/5">
+                      <label class="text-xs font-bold uppercase tracking-widest opacity-40">Container Alignment</label>
+                      <div class="grid grid-cols-2 gap-4">
+                        <div class="space-y-2">
+                           <span class="text-[10px] font-medium opacity-40">Horizontal</span>
+                           <div class="flex gap-1 p-1 rounded-xl bg-black/10">
+                              @for (posH of ['left', 'center', 'right']; track posH) {
+                                <button (click)="updateSetting('containerAlignH', $any(posH))"
+                                   class="flex-1 py-1.5 rounded-lg text-[10px] font-bold transition-all capitalize"
+                                   [class.bg-white]="settings().containerAlignH === posH"
+                                   [class.text-black]="settings().containerAlignH === posH"
+                                   [class.opacity-40]="settings().containerAlignH !== posH">
+                                   {{posH}}
+                                </button>
+                              }
+                           </div>
+                        </div>
+                        <div class="space-y-2">
+                           <span class="text-[10px] font-medium opacity-40">Vertical</span>
+                           <div class="flex gap-1 p-1 rounded-xl bg-black/10">
+                              @for (posV of ['top', 'center', 'bottom']; track posV) {
+                                <button (click)="updateSetting('containerAlignV', $any(posV))"
+                                   class="flex-1 py-1.5 rounded-lg text-[10px] font-bold transition-all capitalize"
+                                   [class.bg-white]="settings().containerAlignV === posV"
+                                   [class.text-black]="settings().containerAlignV === posV"
+                                   [class.opacity-40]="settings().containerAlignV !== posV">
+                                   {{posV}}
+                                </button>
+                              }
+                           </div>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 }
@@ -674,7 +745,7 @@ export class App implements OnInit {
     const count = this.settings().compactLayout
       ? Math.min(this.settings().columns + 2, 8)
       : this.settings().columns;
-    return `repeat(${count}, minmax(0, 1fr))`;
+    return `repeat(${count}, ${this.settings().dialWidth}px)`;
   });
 
   constructor() {
