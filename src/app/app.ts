@@ -93,7 +93,7 @@ async function readSupabaseError(response: Response): Promise<SupabaseApiError> 
 
 function getSupabaseErrorMessage(error: SupabaseApiError): string {
   if (error.code === 'PGRST205') {
-    return 'Supabase table public.backups is missing. Run supabase/setup-backups.sql in the Supabase SQL Editor, then try sync again.';
+    return 'One or more Supabase tables are missing (bookmarks, user_settings). Please ensure your database schema matches documentation/tables-schema.json.';
   }
 
   return error.message || 'Unknown Supabase error.';
@@ -1295,37 +1295,85 @@ export class App implements OnInit {
     (event.target as HTMLInputElement).value = '';
   }
 
-  async syncToSupabase() {
-    const data: StoredAppState = {
-      bookmarks: this.bookmarks(),
-      settings: this.settings()
+  // --- Supabase Mapping Helpers ---
+  private mapBookmarkToDb(bookmark: AppBookmark): any {
+    return {
+      bookmark_id: bookmark.id,
+      title: bookmark.title,
+      url: bookmark.url,
+      icon_url: bookmark.icon,
+      background_image_url: bookmark.backgroundImage || null,
+      show_icon: bookmark.showIcon !== false,
+      bg_depth: bookmark.bgDepth ?? 80,
     };
+  }
 
+  private mapDbToBookmark(db: any): AppBookmark {
+    return {
+      id: db.bookmark_id,
+      title: db.title,
+      url: db.url,
+      icon: db.icon_url,
+      backgroundImage: db.background_image_url || undefined,
+      showIcon: db.show_icon,
+      bgDepth: db.bg_depth,
+    };
+  }
+
+  private mapSettingsToDb(settings: AppSettings): any {
+    return {
+      settings_id: 1, // Using 1 as default settings ID for general sync
+      theme_mode: settings.theme,
+      bg_depth: settings.bgDepth,
+      custom_background_url: settings.backgroundImage || null,
+    };
+  }
+
+  async syncToSupabase() {
     try {
-      await this.supabaseService.upsertData('backups', { id: 'default', state: data });
-      alert('Successfully synced to Supabase!');
+      const dbSettings = this.mapSettingsToDb(this.settings());
+      const dbBookmarks = this.bookmarks().map(bm => this.mapBookmarkToDb(bm));
+
+      const { error: settingsError } = await this.supabaseService.upsertRow('user_settings', dbSettings);
+      if (settingsError) throw settingsError;
+
+      const { error: bookmarksError } = await this.supabaseService.upsertRows('bookmarks', dbBookmarks);
+      if (bookmarksError) throw bookmarksError;
+
+      alert('Successfully synced to Supabase Cloud!');
     } catch (err: any) {
       console.error(err);
-      alert('Failed to sync to Supabase: ' + err.message);
+      alert('Failed to sync to Supabase: ' + getSupabaseErrorMessage(err));
     }
   }
 
   async restoreFromSupabase() {
     try {
-      const rows = await this.supabaseService.getTableData('backups');
-      const defaultBackup = rows?.find((r: any) => r.id === 'default');
+      // Get settings (id 1)
+      const { data: settingsData, error: settingsError } = await this.supabaseService.getRowById('user_settings', 1);
+      if (settingsError && settingsError.code !== 'PGRST116') throw settingsError;
 
-      if (defaultBackup && defaultBackup.state) {
-        const data = defaultBackup.state as StoredAppState;
-        if (data.bookmarks) this.bookmarks.set(data.bookmarks);
-        if (data.settings) this.settings.set({ ...this.settings(), ...data.settings });
-        alert('Successfully restored from Supabase!');
-      } else {
-        alert('No backup found in Supabase.');
+      if (settingsData) {
+        this.settings.set({
+          ...this.settings(),
+          theme: (settingsData.theme_mode as any) || this.settings().theme,
+          bgDepth: settingsData.bg_depth || this.settings().bgDepth,
+          backgroundImage: settingsData.custom_background_url || this.settings().backgroundImage,
+        });
       }
+
+      // Get bookmarks
+      const { data: bookmarksData, error: bookmarksError } = await this.supabaseService.getBookmarks();
+      if (bookmarksError) throw bookmarksError;
+
+      if (bookmarksData && Array.isArray(bookmarksData)) {
+        this.bookmarks.set(bookmarksData.map(db => this.mapDbToBookmark(db)));
+      }
+
+      alert('Successfully restored from Supabase Cloud!');
     } catch (err: any) {
       console.error(err);
-      alert('Failed to restore from Supabase: ' + err.message);
+      alert('Failed to restore from Supabase: ' + getSupabaseErrorMessage(err));
     }
   }
 }

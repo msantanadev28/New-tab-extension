@@ -1,0 +1,172 @@
+[
+  {
+    "table_name": "bookmarks",
+    "columns": [
+      {
+        "column": "bookmark_id",
+        "type": "character varying",
+        "nullable": "NO",
+        "default": null
+      },
+      {
+        "column": "user_id",
+        "type": "uuid",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "title",
+        "type": "character varying",
+        "nullable": "NO",
+        "default": null
+      },
+      {
+        "column": "url",
+        "type": "text",
+        "nullable": "NO",
+        "default": null
+      },
+      {
+        "column": "icon_url",
+        "type": "text",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "background_image_url",
+        "type": "text",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "show_icon",
+        "type": "boolean",
+        "nullable": "YES",
+        "default": "true"
+      },
+      {
+        "column": "bg_depth",
+        "type": "integer",
+        "nullable": "YES",
+        "default": "80"
+      },
+      {
+        "column": "display_order",
+        "type": "integer",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "created_at",
+        "type": "timestamp with time zone",
+        "nullable": "YES",
+        "default": "CURRENT_TIMESTAMP"
+      }
+    ]
+  },
+  {
+    "table_name": "search_engines",
+    "columns": [
+      {
+        "column": "engine_id",
+        "type": "integer",
+        "nullable": "NO",
+        "default": "nextval('search_engines_engine_id_seq'::regclass)"
+      },
+      {
+        "column": "name",
+        "type": "character varying",
+        "nullable": "NO",
+        "default": null
+      },
+      {
+        "column": "url_template",
+        "type": "text",
+        "nullable": "NO",
+        "default": null
+      },
+      {
+        "column": "is_default",
+        "type": "boolean",
+        "nullable": "YES",
+        "default": "false"
+      }
+    ]
+  },
+  {
+    "table_name": "user_settings",
+    "columns": [
+      {
+        "column": "settings_id",
+        "type": "integer",
+        "nullable": "NO",
+        "default": "nextval('user_settings_settings_id_seq'::regclass)"
+      },
+      {
+        "column": "user_id",
+        "type": "uuid",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "bg_depth",
+        "type": "integer",
+        "nullable": "YES",
+        "default": "80"
+      },
+      {
+        "column": "search_engine_url",
+        "type": "text",
+        "nullable": "YES",
+        "default": "'https://www.google.com/search?q='::text"
+      },
+      {
+        "column": "theme_mode",
+        "type": "character varying",
+        "nullable": "YES",
+        "default": "'dark'::character varying"
+      },
+      {
+        "column": "custom_background_url",
+        "type": "text",
+        "nullable": "YES",
+        "default": null
+      },
+      {
+        "column": "updated_at",
+        "type": "timestamp with time zone",
+        "nullable": "YES",
+        "default": "CURRENT_TIMESTAMP"
+      }
+    ]
+  },
+  {
+    "table_name": "users",
+    "columns": [
+      {
+        "column": "user_id",
+        "type": "uuid",
+        "nullable": "NO",
+        "default": "uuid_generate_v4()"
+      },
+      {
+        "column": "email",
+        "type": "character varying",
+        "nullable": "NO",
+        "default": null
+      },
+      {
+        "column": "created_at",
+        "type": "timestamp with time zone",
+        "nullable": "YES",
+        "default": "CURRENT_TIMESTAMP"
+      },
+      {
+        "column": "last_login",
+        "type": "timestamp with time zone",
+        "nullable": "YES",
+        "default": null
+      }
+    ]
+  }
+]

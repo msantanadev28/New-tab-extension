@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>Supabase JS API Interactive Explorer</title>
+	<script src="https://cdn.tailwindcss.com"></script>
+	<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+	<style>
+		.chart-container {
+			position: relative;
+			width: 100%;
+			max-width: 640px;
+			margin-left: auto;
+			margin-right: auto;
+			height: 40vh;
+			max-height: 350px;
+			overflow: hidden;
+			background-color: #ffffff;
+			border-radius: 0.75rem;
+			box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+			padding: 1rem;
+		}
+
+		@media (max-width: 768px) {
+			.chart-container {
+				height: 30vh;
+				max-height: 280px;
+			}
+		}
+
+		.code-block {
+			background-color: #1e293b;
+			color: #f8fafc;
+			padding: 1rem;
+			border-radius: 0.5rem;
+			font-family: monospace;
+			white-space: pre-wrap;
+			overflow-x: auto;
+		}
+
+		.tab-btn.active {
+			border-bottom: 2px solid #10b981;
+			color: #10b981;
+			font-weight: 600;
+		}
+
+		.nav-btn.active {
+			background-color: #d1fae5;
+			color: #065f46;
+			border-right: 4px solid #10b981;
+		}
+
+		/* Custom scrollbar to avoid horizontal scroll and keep vertical neat */
+		::-webkit-scrollbar {
+			width: 8px;
+		}
+
+		::-webkit-scrollbar-track {
+			background: transparent;
+		}
+
+		::-webkit-scrollbar-thumb {
+			background: #cbd5e1;
+			border-radius: 4px;
+		}
+
+		::-webkit-scrollbar-thumb:hover {
+			background: #94a3b8;
+		}
+
+		body {
+			overflow-x: hidden;
+		}
+	</style>
+</head>
+
+<body class="bg-[#fdfbf7] text-slate-800 font-sans h-screen flex flex-col md:flex-row">
+
+	<!-- Chosen Palette: Warm Neutrals with Emerald Accents. Background: #fdfbf7 (Off-white/cream), Sidebar: #ffffff, Accents: #10b981 (Emerald) to represent the database/Supabase brand, Text: Slate 800 for high readability without harsh black. -->
+
+	<!-- Application Structure Plan: The application uses a Dashboard layout. The left sidebar serves as the primary navigation, breaking the API guide into three logical, thematic domains: Overview, Database (CRUD), and Storage. The main content area is dynamic. This structure was chosen because API documentation is best consumed in focused, task-oriented modules rather than a linear scrolling document. It allows users to quickly jump between learning about data manipulation vs file management. Within each module, interactive tabs and visual comparisons help solidify the concepts of JS vs SQL. -->
+
+	<!-- Visualization & Content Choices: 
+         1. Overview Chart (Doughnut): Goal -> Inform. Shows the distribution of API modules in a typical application. Justification -> Gives visual weight to the primary tools developers use. Method -> Chart.js Canvas. 
+         2. Operation Flow Diagram: Goal -> Organize. Shows the relation between CRUD operations. Justification -> Helps conceptualize data lifecycle. Method -> HTML/CSS grid.
+         3. Storage Limits Chart (Bar): Goal -> Compare. Visualizes default file size limits and types. Justification -> Makes abstract limits tangible. Method -> Chart.js Canvas.
+         4. Code Snippet Viewer: Goal -> Inform/Compare. Toggle between JS and SQL. Justification -> Directly answers "how do I do X" while teaching the underlying query language. Method -> Vanilla JS DOM manipulation. 
+         Confirming NO SVG/Mermaid used. -->
+
+	<!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+
+	<nav class="w-full md:w-64 bg-white shadow-md flex-shrink-0 md:h-full z-10">
+		<div class="p-6">
+			<h1 class="text-2xl font-bold text-slate-900 tracking-tight">Supabase<span
+					class="text-emerald-500">Explorer</span></h1>
+			<p class="text-sm text-slate-500 mt-1">Interactive JS API Guide</p>
+		</div>
+		<div class="flex md:flex-col overflow-x-auto md:overflow-visible px-4 md:px-0">
+			<button onclick="navigate('overview')" id="nav-overview"
+				class="nav-btn active flex items-center w-full text-left px-6 py-3 text-slate-600 hover:bg-slate-50 transition-colors whitespace-nowrap">
+				<span class="mr-3 text-xl">🏠</span> Overview
+			</button>
+			<button onclick="navigate('database')" id="nav-database"
+				class="nav-btn flex items-center w-full text-left px-6 py-3 text-slate-600 hover:bg-slate-50 transition-colors whitespace-nowrap">
+				<span class="mr-3 text-xl">🗄️</span> Database (CRUD)
+			</button>
+			<button onclick="navigate('storage')" id="nav-storage"
+				class="nav-btn flex items-center w-full text-left px-6 py-3 text-slate-600 hover:bg-slate-50 transition-colors whitespace-nowrap">
+				<span class="mr-3 text-xl">📂</span> Storage
+			</button>
+			<button onclick="navigate('ddl')" id="nav-ddl"
+				class="nav-btn flex items-center w-full text-left px-6 py-3 text-slate-600 hover:bg-slate-50 transition-colors whitespace-nowrap">
+				<span class="mr-3 text-xl">🛠️</span> Table Management
+			</button>
+		</div>
+	</nav>
+
+	<main class="flex-grow overflow-y-auto p-6 md:p-10 relative" id="main-content">
+	</main>
+
+	<script>
+		const appData = {
+			overview: {
+				title: "Welcome to the Supabase JS API Explorer",
+				intro: "This interactive application provides a comprehensive guide to utilizing the @supabase/supabase-js library. It translates abstract documentation into explorable modules. Here, you will find information on initializing the client, interacting with your Postgres database (CRUD operations), and managing large files in S3-compatible storage buckets. The visualization below illustrates the core abstraction layers provided by the SDK.",
+				content: `
+                    <div class="mb-8 p-6 bg-white rounded-xl shadow-sm border border-slate-100">
+                        <h3 class="text-xl font-semibold mb-4 text-slate-800">Client Initialization</h3>
+                        <p class="text-slate-600 mb-4">Before interacting with any Supabase service, you must initialize the client using your unique project URL and anonymous key. This singleton instance manages authentication and network requests.</p>
+                        <div class="code-block">import { createClient } from '@supabase/supabase-js'
+
+const supabaseUrl = 'https://your-project-url.supabase.co'
+const supabaseKey = 'your-anon-key'
+const supabase = createClient(supabaseUrl, supabaseKey)</div>
+                    </div>
+
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
+                        <div>
+                            <h3 class="text-xl font-semibold mb-3 text-slate-800">Architecture Overview</h3>
+                            <p class="text-slate-600 mb-4">The Supabase client acts as a unified gateway to multiple underlying services. Instead of writing raw SQL or complex REST API calls, you use chained JavaScript methods to build queries and interact with services like Storage and Auth.</p>
+                            <ul class="space-y-3 text-slate-700">
+                                <li class="flex items-center"><span class="w-8 h-8 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center font-bold mr-3">1</span> Database: PostgREST API abstraction</li>
+                                <li class="flex items-center"><span class="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold mr-3">2</span> Storage: AWS S3 compatible wrapper</li>
+                                <li class="flex items-center"><span class="w-8 h-8 rounded-full bg-purple-100 text-purple-600 flex items-center justify-center font-bold mr-3">3</span> Realtime: Websocket subscriptions</li>
+                            </ul>
+                        </div>
+                        <div class="chart-container">
+                            <canvas id="overviewChart"></canvas>
+                        </div>
+                    </div>
+                `
+			},
+			database: {
+				title: "Database Operations (CRUD)",
+				intro: "This section explores how to interact directly with your Postgres database using JavaScript. You can explore Create, Read, Update, and Delete operations. Use the interactive menu below to view the specific syntax, methods, and the equivalent SQL for each operation type.",
+				operations: [
+					{
+						id: 'create',
+						name: 'Create (Insert)',
+						desc: 'Use the <code>.insert()</code> method to add new rows to a table. You can insert a single object or an array of objects for batch operations.',
+						js: `const { data, error } = await supabase\n  .from('profiles')\n  .insert({ username: 'dennis', website: 'https://supabase.com' })\n  .select()`,
+						sql: `INSERT INTO profiles (username, website)\nVALUES ('dennis', 'https://supabase.com')\nRETURNING *;`
+					},
+					{
+						id: 'read',
+						name: 'Search (Read)',
+						desc: 'Use the <code>.select()</code> method combined with filters like <code>.ilike()</code> or <code>.eq()</code> to query specific data.',
+						js: `const { data, error } = await supabase\n  .from('profiles')\n  .select('*')\n  .ilike('username', '%den%') // Pattern matching`,
+						sql: `SELECT * FROM profiles\nWHERE username ILIKE '%den%';`
+					},
+					{
+						id: 'update',
+						name: 'Update (Modify)',
+						desc: 'Use the <code>.update()</code> method to change existing records. <strong>Crucial:</strong> Always chain a filter (like <code>.eq()</code>) to prevent updating every row in the table.',
+						js: `const { data, error } = await supabase\n  .from('profiles')\n  .update({ website: 'https://new-site.com' })\n  .eq('username', 'dennis')`,
+						sql: `UPDATE profiles\nSET website = 'https://new-site.com'\nWHERE username = 'dennis';`
+					},
+					{
+						id: 'delete',
+						name: 'Delete (Remove)',
+						desc: 'Use the <code>.delete()</code> method to remove rows. Like updates, filters are required to target specific records safely.',
+						js: `const { data, error } = await supabase\n  .from('profiles')\n  .delete()\n  .eq('username', 'alice')`,
+						sql: `DELETE FROM profiles\nWHERE username = 'alice';`
+					}
+				]
+			},
+			storage: {
+				title: "Storage Operations",
+				intro: "Supabase Storage provides an interface to manage large files like images, videos, and PDFs in S3-compatible buckets. This section covers the lifecycle of a file: creating buckets, uploading, downloading, listing, and replacing files. It also touches on security mechanisms like Signed URLs for private access.",
+				chartText: "The chart below visualizes standard storage metrics and size limits to help you plan your architecture.",
+				operations: [
+					{ name: 'Create Bucket', js: `const { data, error } = await supabase.storage.createBucket('avatars', { public: true, fileSizeLimit: 2097152, allowedMimeTypes: ['image/png'] })` },
+					{ name: 'Upload File', js: `const { data, error } = await supabase.storage.from('avatars').upload('public/avatar1.png', avatarFile, { cacheControl: '3600', upsert: false })` },
+					{ name: 'Replace (Upsert)', js: `const { data, error } = await supabase.storage.from('avatars').upload('public/avatar1.png', newFile, { upsert: true })` },
+					{ name: 'Download Blob', js: `const { data, error } = await supabase.storage.from('avatars').download('public/avatar1.png')` },
+					{ name: 'List Files', js: `const { data, error } = await supabase.storage.from('avatars').list('public', { limit: 10, search: 'avatar' })` },
+					{ name: 'Get Public URL', js: `const { data } = supabase.storage.from('avatars').getPublicUrl('public/avatar1.png')` },
+					{ name: 'Signed URL (Private)', js: `const { data, error } = await supabase.storage.from('avatars').createSignedUrl('private/secret.pdf', 60)` },
+					{ name: 'Move File', js: `const { data, error } = await supabase.storage.from('avatars').move('old.png', 'new.png')` },
+					{ name: 'Delete File', js: `const { data, error } = await supabase.storage.from('avatars').remove(['public/avatar1.png'])` }
+				]
+			},
+			ddl: {
+				title: "Table Management (DDL)",
+				intro: "While the JavaScript client excels at Data Manipulation Language (DML) like CRUD operations, schema definitions and Data Definition Language (DDL) are intentionally handled via SQL. This architectural decision ensures robust version control and schema migrations. You perform these actions in the Supabase Dashboard SQL Editor.",
+				content: `
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-8">
+                        <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                            <h3 class="text-xl font-semibold mb-2 text-slate-800">➕ Create Table</h3>
+                            <p class="text-sm text-slate-600 mb-4">Define table structure, primary keys, and constraints.</p>
+                            <div class="code-block text-sm">create table table_name (
+  id uuid primary key default gen_random_uuid(),
+  username text unique not null,
+  created_at timestamp with time zone default now()
+);</div>
+                        </div>
+                        <div class="bg-white p-6 rounded-xl shadow-sm border border-red-100">
+                            <h3 class="text-xl font-semibold mb-2 text-red-700">🗑️ Drop Table</h3>
+                            <p class="text-sm text-slate-600 mb-4">Permanently remove a table and all its enclosed data.</p>
+                            <div class="code-block text-sm">drop table if exists table_name;</div>
+                        </div>
+                    </div>
+                    <div class="mt-8 p-4 bg-amber-50 border-l-4 border-amber-500 rounded text-amber-800">
+                        <strong>Architectural Note:</strong> For production applications, avoid creating or altering tables directly via client-side code to maintain security and consistency. Use Database Migrations.
+                    </div>
+                `
+			}
+		};
+
+		let currentChart = null;
+
+		function renderHeader(title, intro) {
+			return `
+                <div class="mb-8 animate-fade-in">
+                    <h2 class="text-3xl font-extrabold text-slate-900 mb-3">${title}</h2>
+                    <p class="text-lg text-slate-600 leading-relaxed max-w-4xl">${intro}</p>
+                </div>
+            `;
+		}
+
+		function renderDatabase() {
+			let html = renderHeader(appData.database.title, appData.database.intro);
+
+			html += `<div class="flex flex-wrap gap-2 mb-6">`;
+			appData.database.operations.forEach((op, index) => {
+				html += `<button onclick="setDbTab('${op.id}')" id="btn-${op.id}" class="db-tab-btn px-4 py-2 rounded-lg font-medium transition-all ${index === 0 ? 'bg-emerald-500 text-white shadow-md' : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'}">${op.name}</button>`;
+			});
+			html += `</div><div id="db-content-area" class="bg-white p-6 rounded-xl shadow-sm border border-slate-100 min-h-[300px]"></div>`;
+			return html;
+		}
+
+		function renderStorage() {
+			let html = renderHeader(appData.storage.title, appData.storage.intro);
+
+			html += `
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                    <div class="lg:col-span-1 space-y-3 max-h-[60vh] overflow-y-auto pr-2">
+            `;
+
+			appData.storage.operations.forEach((op, index) => {
+				html += `
+                    <div onclick="setStorageCode(${index})" class="cursor-pointer p-4 rounded-lg border border-slate-200 hover:border-emerald-500 hover:shadow-md transition-all bg-white group">
+                        <div class="font-semibold text-slate-800 group-hover:text-emerald-600 flex justify-between items-center">
+                            ${op.name} <span class="text-slate-400 group-hover:text-emerald-500 text-lg">▶</span>
+                        </div>
+                    </div>
+                `;
+			});
+
+			html += `
+                    </div>
+                    <div class="lg:col-span-2 flex flex-col space-y-6">
+                        <div id="storage-code-display" class="w-full">
+                            <h4 class="text-lg font-bold mb-2 text-slate-700" id="sc-title">Select an operation to view code</h4>
+                            <div class="code-block" id="sc-code">// Code snippet will appear here</div>
+                        </div>
+                        
+                        <div class="bg-slate-50 p-6 rounded-xl border border-slate-200 mt-auto">
+                            <p class="text-sm text-slate-600 mb-4">${appData.storage.chartText}</p>
+                            <div class="chart-container">
+                                <canvas id="storageChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+			return html;
+		}
+
+		function navigate(section) {
+			document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
+			document.getElementById(`nav-${section}`).classList.add('active');
+
+			const mainContent = document.getElementById('main-content');
+
+			if (currentChart) {
+				currentChart.destroy();
+			}
+
+			if (section === 'overview') {
+				mainContent.innerHTML = renderHeader(appData.overview.title, appData.overview.intro) + appData.overview.content;
+				initOverviewChart();
+			} else if (section === 'database') {
+				mainContent.innerHTML = renderDatabase();
+				setDbTab('create'); // default
+			} else if (section === 'storage') {
+				mainContent.innerHTML = renderStorage();
+				setStorageCode(0); // default
+				initStorageChart();
+			} else if (section === 'ddl') {
+				mainContent.innerHTML = renderHeader(appData.ddl.title, appData.ddl.intro) + appData.ddl.content;
+			}
+		}
+
+		// Interactivity functions for Database Section
+		window.setDbTab = function (id) {
+			const op = appData.database.operations.find(o => o.id === id);
+
+			document.querySelectorAll('.db-tab-btn').forEach(btn => {
+				btn.className = "db-tab-btn px-4 py-2 rounded-lg font-medium transition-all bg-white text-slate-600 hover:bg-slate-100 border border-slate-200";
+			});
+			document.getElementById(`btn-${id}`).className = "db-tab-btn px-4 py-2 rounded-lg font-medium transition-all bg-emerald-500 text-white shadow-md";
+
+			const contentArea = document.getElementById('db-content-area');
+			contentArea.innerHTML = `
+                <p class="text-slate-700 text-lg mb-6 leading-relaxed">${op.desc}</p>
+                <div class="grid grid-cols-1 xl:grid-cols-2 gap-6">
+                    <div>
+                        <div class="flex items-center justify-between mb-2">
+                            <h4 class="font-bold text-slate-800 flex items-center"><span class="bg-yellow-400 text-yellow-900 text-xs font-bold px-2 py-1 rounded mr-2">JS</span> JavaScript API</h4>
+                        </div>
+                        <div class="code-block h-48">${op.js}</div>
+                    </div>
+                    <div>
+                         <div class="flex items-center justify-between mb-2">
+                            <h4 class="font-bold text-slate-800 flex items-center"><span class="bg-blue-500 text-white text-xs font-bold px-2 py-1 rounded mr-2">SQL</span> Underlying Execution</h4>
+                        </div>
+                        <div class="code-block h-48 bg-slate-800">${op.sql}</div>
+                    </div>
+                </div>
+            `;
+		};
+
+		// Interactivity functions for Storage Section
+		window.setStorageCode = function (index) {
+			const op = appData.storage.operations[index];
+			document.getElementById('sc-title').innerText = op.name + " Method";
+			document.getElementById('sc-code').innerText = op.js;
+		};
+
+		// Chart Initialization
+		function initOverviewChart() {
+			const ctx = document.getElementById('overviewChart').getContext('2d');
+			currentChart = new Chart(ctx, {
+				type: 'doughnut',
+				data: {
+					labels: ['Database (PostgREST)', 'Storage (S3)', 'Auth (GoTrue)', 'Realtime'],
+					datasets: [{
+						data: [45, 25, 20, 10],
+						backgroundColor: ['#10b981', '#3b82f6', '#8b5cf6', '#f59e0b'],
+						borderWidth: 0,
+						hoverOffset: 4
+					}]
+				},
+				options: {
+					responsive: true,
+					maintainAspectRatio: false,
+					plugins: {
+						legend: { position: 'right', labels: { font: { family: 'sans-serif' } } },
+						tooltip: { callbacks: { label: function (context) { return ' API Usage Share: ' + context.raw + '%'; } } }
+					},
+					cutout: '60%'
+				}
+			});
+		}
+
+		function initStorageChart() {
+			const ctx = document.getElementById('storageChart').getContext('2d');
+			currentChart = new Chart(ctx, {
+				type: 'bar',
+				data: {
+					labels: ['Avatar Image', 'PDF Document', 'Audio Clip', 'Default Max Limit'],
+					datasets: [{
+						label: 'File Size (MB)',
+						data: [2, 10, 25, 50],
+						backgroundColor: ['#a7f3d0', '#6ee7b7', '#34d399', '#059669'],
+						borderRadius: 4
+					}]
+				},
+				options: {
+					responsive: true,
+					maintainAspectRatio: false,
+					scales: {
+						y: { beginAtZero: true, title: { display: true, text: 'Size in Megabytes (MB)' } }
+					},
+					plugins: {
+						legend: { display: false },
+						tooltip: {
+							callbacks: {
+								label: function (context) {
+									let label = context.dataset.label || '';
+									if (label) { label += ': '; }
+									if (context.parsed.y !== null) { label += context.parsed.y + ' MB'; }
+									return label;
+								}
+							}
+						}
+					}
+				}
+			});
+		}
+
+		// Init App
+		navigate('overview');
+
+		// Add simple CSS animation for content load
+		const style = document.createElement('style');
+		style.innerHTML = `
+            @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+            .animate-fade-in { animation: fadeIn 0.4s ease-out forwards; }
+        `;
+		document.head.appendChild(style);
+
+	</script>
+</body>
+
+</html>
