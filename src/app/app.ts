@@ -1,4 +1,4 @@
-import { Component, signal, computed, effect, inject, PLATFORM_ID, OnInit } from '@angular/core';
+import { Component, signal, computed, effect, inject, PLATFORM_ID, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule, isPlatformBrowser } from '@angular/common';
 import { createIcons, icons } from 'lucide';
 import { LottieComponent, AnimationOptions } from 'ngx-lottie';
@@ -71,6 +71,16 @@ interface SupabaseApiError {
   hint?: string | null;
   message?: string;
 }
+
+type TempUpload = {
+  path: string;
+  url: string;
+};
+
+type BookmarkTempState = {
+  backgroundImage?: TempUpload;
+  icon?: TempUpload;
+};
 
 type ToggleSettingKey = 'centerVertically' | 'compactLayout' | 'openInNewTab' | 'showIcons';
 
@@ -632,9 +642,9 @@ const INITIAL_SETTINGS = mapSpeedDialSettings(INITIAL_SPEED_DIAL_EXPORT);
                       <section class="space-y-3">
                         <h3 class="text-sm font-semibold text-white/50 uppercase tracking-widest">Background Image Source</h3>
                         <div class="flex gap-4">
-                          <input type="text" [value]="settings().backgroundImage || ''"
+                               <input type="text" [value]="settings().backgroundImage || ''"
                                  (input)="onBackgroundChange($event)"
-                                 (paste)="handleImagePaste($event, (res) => updateSetting('backgroundImage', res))"
+                                 (paste)="onSettingsBackgroundPaste($event)"
                                  class="flex-1 p-4 rounded-2xl bg-black/40 border border-white/5 outline-none focus:ring-2 ring-blue-500/50 text-sm text-white placeholder:text-white/20"
                                  placeholder="Enter Image URL or Paste..." />
                           <button (click)="bgFileInput.click()"
@@ -642,7 +652,7 @@ const INITIAL_SETTINGS = mapSpeedDialSettings(INITIAL_SPEED_DIAL_EXPORT);
                             <i class="w-5 h-5" data-lucide="upload"></i>
                           </button>
                         </div>
-                        <input type="file" #bgFileInput accept="image/*" class="hidden" (change)="onBackgroundUpload($event)" />
+                        <input type="file" #bgFileInput accept="image/*" class="hidden" (change)="onSettingsBackgroundFileSelected($any($event.target).files?.[0])" />
                       </section>
 
                       <div class="grid grid-cols-1 md:grid-cols-2 gap-8 py-4">
@@ -780,14 +790,14 @@ const INITIAL_SETTINGS = mapSpeedDialSettings(INITIAL_SPEED_DIAL_EXPORT);
                       <div class="flex-1 space-y-3">
                         <input name="icon" [value]="tempBookmarkIcon() || ''"
                                (input)="tempBookmarkIcon.set($any($event.target).value)"
-                               (paste)="handleImagePaste($event, (res) => tempBookmarkIcon.set(res))"
+                               (paste)="onPaste($event, 'icon')"
                                class="w-full p-3 rounded-xl bg-black/40 border border-white/5 outline-none focus:ring-2 ring-blue-500/50 text-xs text-white"
                                placeholder="Icon URL or paste image..." />
                         <button type="button" (click)="bookmarkIconFileInput.click()"
                                 class="w-full py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/5 transition-all text-xs font-medium text-white">
                           Pick Icon File
                         </button>
-                        <input type="file" #bookmarkIconFileInput accept="image/*" class="hidden" (change)="onBookmarkIconUpload($event)" />
+                        <input type="file" #bookmarkIconFileInput accept="image/*" class="hidden" (change)="onFileSelected($any($event.target).files?.[0], 'icon')" />
                       </div>
                     </div>
                   </div>
@@ -809,7 +819,7 @@ const INITIAL_SETTINGS = mapSpeedDialSettings(INITIAL_SPEED_DIAL_EXPORT);
                     <div class="flex gap-4">
                       <input name="backgroundImage" [value]="tempBookmarkBg() || ''"
                              (input)="tempBookmarkBg.set($any($event.target).value)"
-                             (paste)="handleImagePaste($event, (res) => tempBookmarkBg.set(res))"
+                             (paste)="onPaste($event, 'backgroundImage')"
                              class="flex-1 p-4 rounded-2xl bg-black/40 border border-white/5 outline-none focus:ring-2 ring-blue-500/50 text-sm text-white placeholder:text-white/20"
                              placeholder="Image URL or paste image..." />
                       <button type="button" (click)="bookmarkBgFileInput.click()"
@@ -817,7 +827,7 @@ const INITIAL_SETTINGS = mapSpeedDialSettings(INITIAL_SPEED_DIAL_EXPORT);
                         <i class="w-5 h-5" data-lucide="upload"></i>
                       </button>
                     </div>
-                    <input type="file" #bookmarkBgFileInput accept="image/*" class="hidden" (change)="onBookmarkBgUpload($event)" />
+                    <input type="file" #bookmarkBgFileInput accept="image/*" class="hidden" (change)="onFileSelected($any($event.target).files?.[0], 'backgroundImage')" />
                   </div>
 
                   @if (tempBookmarkBg()) {
@@ -918,7 +928,7 @@ const INITIAL_SETTINGS = mapSpeedDialSettings(INITIAL_SPEED_DIAL_EXPORT);
     }
   `]
 })
-export class App implements OnInit {
+export class App implements OnInit, OnDestroy {
   // --- Signals (State) ---
   bookmarks = signal<AppBookmark[]>(INITIAL_BOOKMARKS);
   recentlyClosed = signal<AppRecentlyClosedTab[]>([]);
@@ -956,7 +966,8 @@ export class App implements OnInit {
   tempBookmarkBg = signal<string | null>(null);
   tempBookmarkIcon = signal<string | null>(null);
   tempBookmarkDepth = signal<number>(80);
-  tempBookmarkBlobs = signal<string[]>([]);
+  tempState: BookmarkTempState = {};
+  settingsBackgroundTempUpload: TempUpload | null = null;
   buildFaviconUrl = buildFaviconUrl;
 
   isSyncing = signal(false);
@@ -1077,6 +1088,10 @@ export class App implements OnInit {
     setTimeout(() => createIcons({ icons }), 100);
   }
 
+  ngOnDestroy() {
+    void this.cleanupTempUploads();
+  }
+
   private initData() {
     const hasChromeStorage = typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local;
 
@@ -1164,7 +1179,7 @@ export class App implements OnInit {
     this.tempBookmarkBg.set(null);
     this.tempBookmarkIcon.set(null);
     this.tempBookmarkDepth.set(80);
-    this.tempBookmarkBlobs.set([]);
+    this.tempState = {};
     this.isAddModalOpen.set(true);
   }
 
@@ -1174,19 +1189,26 @@ export class App implements OnInit {
     this.tempBookmarkBg.set(bookmark.backgroundImage || null);
     this.tempBookmarkIcon.set(bookmark.icon || null);
     this.tempBookmarkDepth.set(bookmark.bgDepth ?? 80);
-    this.tempBookmarkBlobs.set([]);
+    this.tempState = {};
     this.isAddModalOpen.set(true);
   }
 
-  closeModals() {
+  async closeModals(cleanupTempUploads = true) {
+    if (cleanupTempUploads) {
+      await this.cleanupTempUploads();
+    }
+
+    this.resetModalState();
+  }
+
+  private resetModalState() {
     this.isSettingsOpen.set(false);
     this.isAddModalOpen.set(false);
     this.editingBookmark.set(null);
     this.tempBookmarkBg.set(null);
     this.tempBookmarkIcon.set(null);
     this.tempBookmarkDepth.set(80);
-    void this.cleanupTemporaryBookmarkBlobs();
-    this.tempBookmarkBlobs.set([]);
+    this.tempState = {};
     this.settingsTab.set('general');
   }
 
@@ -1204,49 +1226,88 @@ export class App implements OnInit {
     this.updateSetting('backgroundImage', val);
   }
 
-  onBackgroundUpload(event: Event) {
-    const file = (event.target as HTMLInputElement).files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const result = e.target?.result as string;
-        this.updateSetting('backgroundImage', result);
-      };
-      reader.readAsDataURL(file);
+  async onSettingsBackgroundFileSelected(file: File | undefined) {
+    if (!file) {
+      return;
+    }
+
+    try {
+      await this.handleSettingsBackgroundUpload(file);
+    } catch (err) {
+      console.error(err);
+      toast.error(this.getImageUploadErrorMessage(err));
     }
   }
 
-  onBookmarkBgUpload(event: Event) {
-    void this.handleBookmarkImageSelection(event, (result) => this.tempBookmarkBg.set(result));
-  }
-
-  async handleImagePaste(event: ClipboardEvent, callback: (result: string) => void) {
+  async onSettingsBackgroundPaste(event: ClipboardEvent) {
     const items = event.clipboardData?.items;
-    if (!items) return;
+    if (!items) {
+      return;
+    }
 
-    for (let i = 0; i < items.length; i++) {
-      if (items[i].type.indexOf('image') !== -1) {
-        const file = items[i].getAsFile();
-        if (file) {
-          // Prevent the default paste if it's an image
-          event.preventDefault();
-          try {
-            const uploadedUrl = await this.uploadBookmarkImage(file);
-            if (uploadedUrl) {
-              callback(uploadedUrl);
-            }
-          } catch (err) {
-            console.error(err);
-            toast.error(this.getImageUploadErrorMessage(err));
-          }
-        }
-        break;
+    for (let index = 0; index < items.length; index++) {
+      if (!items[index].type.startsWith('image')) {
+        continue;
       }
+
+      const file = items[index].getAsFile();
+      if (!file) {
+        continue;
+      }
+
+      event.preventDefault();
+
+      try {
+        await this.handleSettingsBackgroundUpload(file);
+      } catch (err) {
+        console.error(err);
+        toast.error(this.getImageUploadErrorMessage(err));
+      }
+
+      break;
     }
   }
 
-  async onBookmarkIconUpload(event: Event) {
-    await this.handleBookmarkImageSelection(event, (result) => this.tempBookmarkIcon.set(result));
+  async onFileSelected(file: File | undefined, field: 'backgroundImage' | 'icon') {
+    if (!file) {
+      return;
+    }
+
+    try {
+      await this.handleImageUpload(file, field);
+    } catch (err) {
+      console.error(err);
+      toast.error(this.getImageUploadErrorMessage(err));
+    }
+  }
+
+  async onPaste(event: ClipboardEvent, field: 'backgroundImage' | 'icon') {
+    const items = event.clipboardData?.items;
+    if (!items) {
+      return;
+    }
+
+    for (let index = 0; index < items.length; index++) {
+      if (!items[index].type.startsWith('image')) {
+        continue;
+      }
+
+      const file = items[index].getAsFile();
+      if (!file) {
+        continue;
+      }
+
+      event.preventDefault();
+
+      try {
+        await this.handleImageUpload(file, field);
+      } catch (err) {
+        console.error(err);
+        toast.error(this.getImageUploadErrorMessage(err));
+      }
+
+      break;
+    }
   }
 
   async handleBookmarkSubmit(e: Event) {
@@ -1262,17 +1323,16 @@ export class App implements OnInit {
     const finalDepth = this.tempBookmarkDepth();
 
     try {
-      const finalIcon = await this.uploadBookmarkImage(this.tempBookmarkIcon() || customIcon) || buildFaviconUrl(url);
-      const finalBg = await this.uploadBookmarkImage(this.tempBookmarkBg() || backgroundImage);
-      await this.cleanupTemporaryBookmarkBlobs([finalIcon, finalBg].filter((value): value is string => Boolean(value)));
+      const finalIcon = this.tempState.icon?.url ?? this.tempBookmarkIcon() ?? customIcon ?? buildFaviconUrl(url);
+      const finalBg = this.tempState.backgroundImage?.url ?? this.tempBookmarkBg() ?? backgroundImage ?? undefined;
       const editItem = this.editingBookmark();
 
       if (editItem) {
-        this.bookmarks.update(prev => prev.map(b => b.id === editItem.id ? { ...b, title, url, icon: finalIcon, backgroundImage: finalBg ?? undefined, showIcon, bgDepth: finalDepth } : b));
+        this.bookmarks.update(prev => prev.map(b => b.id === editItem.id ? { ...b, title, url, icon: finalIcon, backgroundImage: finalBg, showIcon, bgDepth: finalDepth } : b));
       } else {
-        this.bookmarks.update(prev => [...prev, { id: Date.now().toString(), title, url, icon: finalIcon, backgroundImage: finalBg ?? undefined, showIcon, bgDepth: finalDepth }]);
+        this.bookmarks.update(prev => [...prev, { id: Date.now().toString(), title, url, icon: finalIcon, backgroundImage: finalBg, showIcon, bgDepth: finalDepth }]);
       }
-      this.closeModals();
+      await this.closeModals(false);
     } catch (err) {
       console.error(err);
       toast.error(this.getImageUploadErrorMessage(err));
@@ -1296,53 +1356,61 @@ export class App implements OnInit {
     return 'Failed to upload image.';
   }
 
-  private trackTemporaryBookmarkBlob(url: string) {
-    if (!this.editingBookmark()) {
+  private buildUploadPath(file: File | Blob): string {
+    const fileName = file instanceof File && file.name ? file.name : `image${this.getFileExtension(file.type)}`;
+    const safeName = fileName
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9._-]+/g, '-')
+      .replace(/^-+|-+$/g, '') || 'image';
+
+    return `${Date.now()}_${safeName}`;
+  }
+
+  private getFileExtension(contentType: string | null | undefined): string {
+    const normalizedContentType = (contentType || '').toLowerCase();
+
+    if (normalizedContentType.includes('png')) return '.png';
+    if (normalizedContentType.includes('jpeg') || normalizedContentType.includes('jpg')) return '.jpg';
+    if (normalizedContentType.includes('webp')) return '.webp';
+    if (normalizedContentType.includes('gif')) return '.gif';
+    if (normalizedContentType.includes('svg')) return '.svg';
+    if (normalizedContentType.includes('bmp')) return '.bmp';
+    if (normalizedContentType.includes('avif')) return '.avif';
+
+    return '';
+  }
+
+  private toFile(blob: File | Blob, fileName?: string): File {
+    if (blob instanceof File) {
+      return blob;
+    }
+
+    return new File([blob], fileName || `image${this.getFileExtension(blob.type)}`, {
+      type: blob.type || 'application/octet-stream'
+    });
+  }
+
+  private async deleteTempUpload(tempUpload?: TempUpload) {
+    if (!tempUpload) {
       return;
     }
 
-    this.tempBookmarkBlobs.update((currentBlobs) => [...currentBlobs, url]);
-  }
-
-  private getStoragePathFromPublicUrl(url: string, bucket = BOOKMARK_IMAGE_BUCKET): string | null {
     try {
-      const parsedUrl = new URL(url);
-      const marker = `/storage/v1/object/public/${bucket}/`;
-      const markerIndex = parsedUrl.pathname.indexOf(marker);
-
-      if (markerIndex === -1) {
-        return null;
-      }
-
-      return decodeURIComponent(parsedUrl.pathname.slice(markerIndex + marker.length));
-    } catch {
-      return null;
-    }
-  }
-
-  private async deleteTemporaryBookmarkBlob(url: string, bucket = BOOKMARK_IMAGE_BUCKET) {
-    const storagePath = this.getStoragePathFromPublicUrl(url, bucket);
-    if (!storagePath) {
-      return;
-    }
-
-    try {
-      await this.supabaseStorageService.deleteFile(bucket, storagePath);
+      await this.supabaseStorageService.deleteFile(BOOKMARK_IMAGE_BUCKET, tempUpload.path);
     } catch (err) {
       console.error('Failed to delete temporary bookmark upload', err);
     }
   }
 
-  private async cleanupTemporaryBookmarkBlobs(keepUrls: string[] = []) {
-    const keepSet = new Set(keepUrls.filter(Boolean));
-    const temporaryBlobs = [...this.tempBookmarkBlobs()];
-    this.tempBookmarkBlobs.set([]);
+  async cleanupTempUploads(): Promise<void> {
+    const currentTempState = this.tempState;
+    this.tempState = {};
 
-    await Promise.all(
-      temporaryBlobs
-        .filter((url) => !keepSet.has(url))
-        .map((url) => this.deleteTemporaryBookmarkBlob(url))
-    );
+    await Promise.allSettled([
+      this.deleteTempUpload(currentTempState.backgroundImage),
+      this.deleteTempUpload(currentTempState.icon),
+    ]);
   }
 
   private async withUploadLoading<T>(message: string, operation: () => Promise<T>): Promise<T> {
@@ -1356,75 +1424,69 @@ export class App implements OnInit {
     }
   }
 
-  private async uploadBookmarkImage(input: string | File | ClipboardEvent, bucket = BOOKMARK_IMAGE_BUCKET): Promise<string | null> {
-    if (typeof input === 'string') {
-      const value = input.trim();
+  async handleImageUpload(file: File | Blob, field: 'backgroundImage' | 'icon'): Promise<void> {
+    const uploadFile = this.toFile(file);
+    const path = this.buildUploadPath(uploadFile);
+    const previous = this.tempState[field];
 
-      if (!value) {
-        return null;
-      }
+    const uploadedUrl = await this.withUploadLoading(
+      field === 'backgroundImage' ? 'Uploading background image to Supabase...' : 'Uploading icon to Supabase...',
+      async () => {
+        const { error } = await this.supabaseStorageService.uploadFile(BOOKMARK_IMAGE_BUCKET, path, uploadFile);
 
-      if (this.isUploadedStorageUrl(value, bucket)) {
-        return value;
-      }
-
-      if (value.startsWith('http')) {
-        return await this.withUploadLoading('Uploading image URL to Supabase...', () =>
-          this.supabaseStorageService.uploadFromUrl(value, bucket)
-        );
-      }
-
-      return value;
-    }
-
-    if (input instanceof File) {
-      const uploadedUrl = await this.withUploadLoading('Uploading local image to Supabase...', () =>
-        this.supabaseStorageService.uploadFromFile(input, bucket)
-      );
-
-      this.trackTemporaryBookmarkBlob(uploadedUrl);
-      return uploadedUrl;
-    }
-
-    if (this.isClipboardImageEvent(input)) {
-      const items = input.clipboardData?.items;
-      if (!items) {
-        return null;
-      }
-
-      for (let index = 0; index < items.length; index++) {
-        if (items[index].type.startsWith('image')) {
-          const file = items[index].getAsFile();
-          if (file) {
-            const uploadedUrl = await this.withUploadLoading('Uploading clipboard image to Supabase...', () =>
-              this.supabaseStorageService.uploadFromFile(file, bucket)
-            );
-
-            this.trackTemporaryBookmarkBlob(uploadedUrl);
-            return uploadedUrl;
-          }
+        if (error) {
+          throw error;
         }
+
+        return this.supabaseStorageService.getPublicUrl(BOOKMARK_IMAGE_BUCKET, path).data.publicUrl;
+      }
+    );
+
+    if (previous?.path && previous.path !== path) {
+      try {
+        await this.supabaseStorageService.deleteFile(BOOKMARK_IMAGE_BUCKET, previous.path);
+      } catch (err) {
+        console.error('Failed to delete replaced temporary bookmark upload', err);
       }
     }
 
-    return null;
+    this.tempState = {
+      ...this.tempState,
+      [field]: { path, url: uploadedUrl },
+    };
+
+    if (field === 'backgroundImage') {
+      this.tempBookmarkBg.set(uploadedUrl);
+    } else {
+      this.tempBookmarkIcon.set(uploadedUrl);
+    }
   }
 
-  private async handleBookmarkImageSelection(event: Event, callback: (result: string) => void) {
-    const file = (event.target as HTMLInputElement).files?.[0];
-    if (!file) {
-      return;
+  async handleSettingsBackgroundUpload(file: File | Blob): Promise<void> {
+    const uploadFile = this.toFile(file);
+    const path = this.buildUploadPath(uploadFile);
+    const previous = this.settingsBackgroundTempUpload;
+
+    const uploadedUrl = await this.withUploadLoading('Uploading dashboard background to Supabase...', async () => {
+      const { error } = await this.supabaseStorageService.uploadFile(BOOKMARK_IMAGE_BUCKET, path, uploadFile);
+
+      if (error) {
+        throw error;
+      }
+
+      return this.supabaseStorageService.getPublicUrl(BOOKMARK_IMAGE_BUCKET, path).data.publicUrl;
+    });
+
+    if (previous?.path && previous.path !== path) {
+      try {
+        await this.supabaseStorageService.deleteFile(BOOKMARK_IMAGE_BUCKET, previous.path);
+      } catch (err) {
+        console.error('Failed to delete replaced dashboard background upload', err);
+      }
     }
 
-    try {
-      const uploadedUrl = await this.uploadBookmarkImage(file);
-      if (uploadedUrl) {
-        callback(uploadedUrl);
-      }
-    } catch (err) {
-      console.error(err);
-      toast.error(this.getImageUploadErrorMessage(err));
-    }
+    this.settingsBackgroundTempUpload = { path, url: uploadedUrl };
+    this.updateSetting('backgroundImage', uploadedUrl);
   }
 
   exportSettings() {
